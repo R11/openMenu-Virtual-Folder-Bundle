@@ -7,12 +7,15 @@ openMenu was originally written by [mrneo240](https://github.com/mrneo240/openme
 To accommodate the new openMenu, a modified version of [GD MENU Card Manager](https://github.com/sonik-br/GDMENUCardManager) has been developed and included in this bundle.
 
 ## Table of Contents
+
 table of contents go here
 
 ## Current Version
+
 openMenu Virtual Folder Bundle is currently at at version [1.0](xxxx).
 
 ## Changelog
+
 - **Version 1.0 (2025-01-XX)**
   * Initial release.
 
@@ -21,6 +24,7 @@ openMenu Virtual Folder Bundle is currently at at version [1.0](xxxx).
 Many components of both openMenu and GD MENU Card Manager have been drastically overhauled for this version. See below for a list of changes.
 
 ### Changes Since openMenu v1.3.0
+
 - New folder view mode, plus custom themes:
   * 8 subfolders max
   * Complete subfolder path maximum length is 256 characters
@@ -40,9 +44,14 @@ Many components of both openMenu and GD MENU Card Manager have been drastically 
 - Game ID is not sent to VM2/VMUPro/USB4MAPLE when a non-game disc is launched (e.g., an audio CD).
 
 ### Changes Since GD MENU Card Manager v2.0.1
+
 - Game list column widths adjusted for better visibility.
 - Version check in About window removed (with possibility of returning in the future).
 - A new "Folder" column added when building menu in "openMenu" mode, allowing users to specify virtual folder path for a disc image (e.g., `Games\RPGs\NTSC-U`).
 - Non-game disc images now supported, with a new column named "Type" added where users can select from two drop-down options: `Game` and `Other`. Note that non-game disc images are automatically assigned the `Other` value, as openMenu will check this property to decide how to initialize the GDEMU.
 - Disc image names no longer limited to 39 characters, increased to 256 characters.
 - Disc numbers can now be customized by the user (e.g., `1/3`, `2/4`).
+
+## Usage Tutorial
+
+Usage documentation and tuturial video link goes here.
