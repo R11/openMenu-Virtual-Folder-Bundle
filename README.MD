@@ -7,7 +7,7 @@ openMenu was originally written by [mrneo240](https://github.com/mrneo240/openme
 To accommodate the new openMenu, a modified version of [GD MENU Card Manager](https://github.com/sonik-br/GDMENUCardManager) has been developed and included in this bundle.
 
 ## Table of Contents
-<table of contents go here>
+table of contents go here
 
 ## Current Version
 openMenu Virtual Folder Bundle is currently at at version [1.0](xxxx).
