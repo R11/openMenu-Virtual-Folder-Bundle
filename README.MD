@@ -152,7 +152,7 @@ artwork_size=210
 
 After making desited changes to `THEME.INI`, use a preferred image editor to create two PNGs: one with a resolution of 512x512px named `BG_L.PNG`, the other with a resolution of 128x512 pixels named `BG_R.PNG`. Templates for these can be found in the `tools\openMenu\menu_data\theme\FOLDERS` folder.
 
-Split a 640x480px background image across these two PNGs, noting that the bottom row of 32 pixels will be ignored.
+Split a 640x480px background image across these two PNGs, noting that the bottom row of 32 pixels will be ignored. The [included template](https://github.com/DerekPascarella/openMenu-Virtual-Folder-Bundle/raw/refs/heads/main/theme_template/theme_template.xcf) for use with [The GIMP](https://www.gimp.org/) may prove useful to some users.
 
 ![theme_1.png](https://github.com/DerekPascarella/openMenu-Virtual-Folder-Bundle/blob/main/images/theme_1.png?raw=true)
 
