@@ -14,8 +14,6 @@ To accommodate the new openMenu, a modified version of [GD MENU Card Manager](ht
 
 ## Table of Contents
 
-- [openMenu Virtual Folder Bundle](#openmenu-virtual-folder-bundle)
-- [Table of Contents](#table-of-contents)
 - [Current Version](#current-version)
 - [Changelog](#changelog)
 - [Credits](#credits)
