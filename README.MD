@@ -605,7 +605,7 @@ clock_text_color=255,255,255
 
 - **name**: Theme display name shown in settings menu (e.g., `FoldersDefault`)
 
-### Colors
+### Color Styling
 
 - **text_color**: Color for normal (non-selected) game names in the list
 
@@ -647,7 +647,7 @@ clock_text_color=255,255,255
 
   _Example_: `0,0,0` (black)
 
-### Game List Positioning
+### Game List Positioning and Sizing
 
 - **list_x**: Horizontal position of game list (left edge)
 
@@ -665,7 +665,7 @@ clock_text_color=255,255,255
 
   _Example_: `49` (names longer than 49 characters will marquee scroll)
 
-### Artwork Positioning
+### Artwork Positioning and Sizing
 
 - **artwork_x**: Horizontal position of box art/artwork (left edge)
 
@@ -689,7 +689,7 @@ clock_text_color=255,255,255
 
   _Example_: `430` (430 pixels from top screen edge)
 
-### Optional Clock
+### Optional Clock Positioning and Color Styling
 
 - **clock_x**: Horizontal position of the clock's right edge (right-justified)
 
