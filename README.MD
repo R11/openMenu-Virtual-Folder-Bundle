@@ -608,60 +608,99 @@ clock_text_color=255,255,255
 ### Colors
 
 - **text_color**: Color for normal (non-selected) game names in the list
+
   _Example_: `255,255,255` (white)
+
 - **highlight_color**: Color for the currently selected game name
+
   _Example_: `207,62,17` (orange-red)
+
 - **cursor_color**: Background color for the selection cursor rectangle
+
   _Example_: `75,75,75` (dark gray)
+
 - **multidisc_color**: Color for the multi-disc indicator icon/text
+
   _Example_: `207,62,17` (orange-red)
+
 - **menu_title_color**: Color for popup titles (`Settings`, `Credits`, `Multi-Disc`, etc.)
+
   _Example_: `0,0,0` (black)
+
 - **menu_text_color**: Color for text items in popup menus
+
   _Example_: `255,255,255` (white)
+
 - **menu_highlight_color**: Color for highlighted/selected menu items
+
   _Example_: `207,62,17` (orange-red)
+
 - **menu_bkg_color**: Background fill color for popup boxes
+
   _Example_: `0,0,0` (black)
+
 - **menu_bkg_border_color**: Border outline color for popup boxes
+
   _Example_: `255,255,255` (white)
+
 - **item_details_text_color**: Color for the item details text (region, date, etc.) below artwork
+
   _Example_: `0,0,0` (black)
 
 ### Game List Positioning
 
 - **list_x**: Horizontal position of game list (left edge)
+
   _Example_: `12` (12 pixels from left screen edge)
+
 - **list_y**: Vertical position of game list (top of first item)
+
   _Example_: `68` (68 pixels from top screen edge)
+
 - **list_count**: Number of game entries visible per page
+
   _Example_: `18` (18 items displayed at once)
+
 - **list_marquee_threshold**: Maximum characters before name scrolls horizontally
+
   _Example_: `49` (names longer than 49 characters will marquee scroll)
 
 ### Artwork Positioning
 
 - **artwork_x**: Horizontal position of box art/artwork (left edge)
+
   _Example_: `415` (415 pixels from left screen edge)
+
 - **artwork_y**: Vertical position of box art/artwork (top edge)
+
   _Example_: `215` (215 pixels from top screen edge)
+
 - **artwork_size**: Width and height of artwork square in pixels
+
   _Example_: `210` (210x210 pixel square)
 
 ### Item Details Positioning
 
 - **item_details_x**: Horizontal center point for item details text below artwork
+
   _Example_: `521` (text centered around 521 pixels from left)
+  
 - **item_details_y**: Vertical position of item details text
+
   _Example_: `430` (430 pixels from top screen edge)
 
 ### Optional Clock
 
 - **clock_x**: Horizontal position of the clock's right edge (right-justified)
+
   _Example_: `628` (clock text ends at 628 pixels from left)
+
 - **clock_y**: Vertical position of clock text
+
   _Example_: `24` (24 pixels from top screen edge)
+
 - **clock_text_color**: RGB color for clock text
+
   _Example_: `255,255,255` (white text)
 
 **Note**: All position values are absolute pixel coordinates for 640x480 resolution. If a positioning key is set to `0` or omitted, Folders mode uses built-in fallback defaults. The cursor width is calculated automatically based on `list_marquee_threshold`.
