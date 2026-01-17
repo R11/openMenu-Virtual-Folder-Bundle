@@ -289,7 +289,9 @@ Use the **Move Up** and **Move Down** buttons (arrow icons) to change the order 
 - **Using its folder name on computer** - Uses the containing folder's name, such as `Nakoruru - The Gift She Gave Me (T-En)` (disabled when disc image is already on SD card).
 - **Using disc image's base file name** - Uses the disc image's filename, such as `Intrepid Izzy.cdi` or `D2.gdi` (disabled when disc image is already on SD card).
 
-**Sentence Case**: Right-click selected games and choose **Sentence Case** to convert titles to Title Case formatting.
+**Sentence Case**
+
+Right-click selected games and choose **Sentence Case** to convert titles to Title Case formatting.
 
 #### Virtual Folders (openMenu Only)
 
