@@ -32,6 +32,7 @@ set(OPENMENU_SOURCES
         src/ui/ui_folders.c
         src/vm2/vm2_api.c
         src/dcnow/dcnow_api.c
+        src/dcnow/dcnow_json.c
 )
 
 add_executable(openmenu ${OPENMENU_SOURCES})
@@ -39,7 +40,8 @@ add_executable(openmenu ${OPENMENU_SOURCES})
 # Pass version string and feature flags as compile definitions
 target_compile_definitions(openmenu PRIVATE
     OPENMENU_BUILD_VERSION="${OPENMENU_VERSION}"
-    DCNOW_USE_STUB_DATA=1  # Enable stub data for DC Now feature testing
+    # DCNOW_USE_STUB_DATA=1  # Uncomment for stub data testing on non-DC platforms
+    # Real network implementation is enabled by default on Dreamcast (_arch_dreamcast)
 )
 
 target_include_directories(openmenu

@@ -44,6 +44,7 @@ To accommodate the new openMenu, a modified version of [GD MENU Card Manager](ht
     - [Saving Changes](#saving-changes)
     - [Keyboard Shortcuts](#keyboard-shortcuts)
 - [openMenu Usage](#openmenu-usage)
+  - [DC Now (Dreamcast Live) Player Status](#dc-now-dreamcast-live-player-status) 🆕
   - [VGA and Region Patching](#vga-and-region-patching)
   - [Using Cheats](#using-cheats)
   - [Virtual VMU Device Support](#virtual-vmu-device-support)
@@ -391,6 +392,31 @@ A "Done!" message confirms successful completion.
 | **Escape** | Close Info or About windows. |
 
 ## openMenu Usage
+
+### DC Now (Dreamcast Live) Player Status
+
+🆕 **NEW FEATURE**: View active player counts for Dreamcast Live games in real-time!
+
+Press **L + R triggers together** to open the DC Now popup, which displays:
+- Total active players across all Dreamcast Live games
+- Individual game names with their current player counts
+- Real-time status (online/offline) for each game
+
+**Requirements:**
+- Network connectivity via Broadband Adapter (BBA) or DreamPi
+- Internet connection to reach dreamcast.online
+
+**Controls:**
+- **L + R**: Open DC Now popup
+- **Up/Down**: Scroll through game list
+- **START**: Refresh data from server
+- **A or B**: Close popup
+
+The data is automatically cached after the first fetch to reduce network calls. Press START to refresh with the latest player counts.
+
+For technical details, build instructions, and implementation information, see:
+- `BUILD_INSTRUCTIONS.md` - How to build openMenu with DC Now
+- `DCNOW_IMPLEMENTATION.md` - Technical implementation details
 
 ### VGA and Region Patching
 

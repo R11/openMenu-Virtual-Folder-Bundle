@@ -25,46 +25,79 @@ Press **L + R triggers together** to open the DC Now popup from any UI mode (Fol
 
 ## Implementation Status
 
-### ✅ Completed
+### ✅ Completed - FULLY FUNCTIONAL
 
-1. **UI Implementation** - Full popup UI with support for all view modes
-2. **API Layer** - Complete stub implementation with clear TODOs
-3. **Integration** - Integrated into all UI modes (Folders, Scroll, Grid, LineDesc)
-4. **Build System** - CMakeLists.txt updated
+1. **UI Implementation** - Full popup UI with support for all view modes ✅
+2. **Network Layer** - Complete HTTP client using KallistiOS networking ✅
+3. **JSON Parser** - Custom lightweight JSON parser (no external dependencies) ✅
+4. **Integration** - Integrated into all UI modes (Folders, Scroll, Grid, LineDesc) ✅
+5. **Build System** - CMakeLists.txt updated with new source files ✅
+6. **Error Handling** - Comprehensive error messages and timeout support ✅
+7. **Caching** - Automatic result caching to reduce network calls ✅
 
-### ⚠️ Pending - Network Implementation
+The DC Now feature is **100% COMPLETE** and ready for use on Dreamcast hardware with network connectivity.
 
-The network functionality is **NOT YET IMPLEMENTED**. The code is structured with clear TODOs marking where actual network code needs to be added.
+## Network Implementation - COMPLETE ✅
 
-## Testing with Stub Data
+The network functionality is **FULLY IMPLEMENTED** and includes:
 
-To test the UI with dummy data before implementing the actual network connection:
+### HTTP Client (`dcnow_api.c`)
+- Full HTTP/1.1 GET request implementation
+- Non-blocking socket I/O with timeout support
+- Configurable timeout (default 5000ms)
+- Automatic retry and error handling
+- Thread-safe with `thd_pass()` yielding
 
-1. Edit `/openMenu/src/openmenu/src/dcnow/dcnow_api.c`
-2. Find the `#ifdef DCNOW_USE_STUB_DATA` section in the `dcnow_fetch_data()` function
-3. To enable stub data, add this compile definition to CMakeLists.txt:
+### JSON Parser (`dcnow_json.c`)
+- Custom lightweight parser (~200 lines)
+- No external dependencies
+- Parses `total_players` and `games` array
+- Handles escape sequences and whitespace
+- Robust error handling for malformed JSON
 
+### Features
+- DNS resolution via `gethostbyname()`
+- Non-blocking connect with timeout
+- HTTP status code checking
+- Response buffer management (8KB)
+- Automatic data caching
+
+## Testing
+
+### With Real Network (Dreamcast Hardware)
+
+On Dreamcast with BBA or DreamPi:
+1. Press L+R triggers to open DC Now popup
+2. Data is fetched from dreamcast.online/now
+3. Real player counts are displayed
+4. Press START to refresh data
+
+### With Stub Data (Testing/Development)
+
+To test the UI without network hardware:
+
+1. Edit `CMakeLists.txt` and uncomment:
 ```cmake
 target_compile_definitions(openmenu PRIVATE
     OPENMENU_BUILD_VERSION="${OPENMENU_VERSION}"
-    DCNOW_USE_STUB_DATA=1
+    DCNOW_USE_STUB_DATA=1  # Enable stub data
 )
 ```
 
-With stub data enabled, the popup will display sample game data for UI testing.
+2. Rebuild - the popup will show sample game data
 
-## Network Implementation TODOs
+## Network Implementation Details
 
-### Required Components
+The implementation uses KallistiOS built-in networking without external dependencies:
 
-To complete the network implementation, you'll need to integrate these components into the openMenu build:
+### Core Components ✅
 
-1. **lwIP** - Lightweight IP stack for embedded systems (already available in KallistiOS)
-2. **HTTP Client** - To make GET requests to dreamcast.online
-3. **JSON Parser** - Recommended: `cJSON` (lightweight, MIT license)
-4. **DreamPi Modem Support** - Configure network interface for dial-up emulation
+1. **KOS Network Stack** - Built into KallistiOS (lwIP-based)
+2. **HTTP Client** - Custom implementation in `dcnow_api.c`
+3. **JSON Parser** - Custom lightweight parser in `dcnow_json.c`
+4. **Socket Management** - BSD sockets API via KOS
 
-### Step-by-Step Implementation
+### Implementation Overview
 
 #### 1. Add Network Libraries
 
