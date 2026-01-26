@@ -49,7 +49,6 @@ jobs:
             cd \$KOS_BASE/addons/libppp
             make clean || true
             make
-            make install
 
             echo ''
             echo 'Verifying libppp.a was built:'
