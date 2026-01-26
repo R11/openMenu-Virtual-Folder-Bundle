@@ -685,12 +685,12 @@ handle_input_ui(enum control input) {
     /* Check for L+R triggers pressed together to open DC Now popup */
     if (input == TRIG_L && INPT_TriggerPressed(TRIGGER_R)) {
         /* Both triggers pressed - open DC Now popup */
-        dcnow_setup(&draw_current, current_theme_colors, &navigate_timeout, current_theme_colors->menu_title_color);
+        dcnow_setup(&draw_current, current_theme_colors, &navigate_timeout, current_theme_colors->menu_highlight_color);
         return;
     }
     if (input == TRIG_R && INPT_TriggerPressed(TRIGGER_L)) {
         /* Both triggers pressed - open DC Now popup */
-        dcnow_setup(&draw_current, current_theme_colors, &navigate_timeout, current_theme_colors->menu_title_color);
+        dcnow_setup(&draw_current, current_theme_colors, &navigate_timeout, current_theme_colors->menu_highlight_color);
         return;
     }
 
