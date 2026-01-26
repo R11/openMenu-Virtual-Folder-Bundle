@@ -40,20 +40,23 @@ jobs:
             set -e
             source /opt/toolchains/dc/kos/environ.sh
 
-            echo 'Cleaning previous build...'
-            rm -rf build
+            echo 'KallistiOS environment:'
+            echo \"KOS_BASE=\$KOS_BASE\"
+            echo \"KOS_CMAKE_TOOLCHAIN=\$KOS_CMAKE_TOOLCHAIN\"
 
-            echo 'Configuring with CMake...'
-            mkdir -p build
-            cd build
-            cmake -G Ninja -DBUILD_DREAMCAST=ON -DBUILD_PC=OFF ..
+            echo ''
+            echo 'Cleaning previous build...'
+            rm -rf cmake-build-dc-release
+
+            echo 'Configuring with CMake preset...'
+            cmake --preset dc-release
 
             echo 'Building with Ninja...'
-            ninja
+            cmake --build cmake-build-dc-release
 
             echo ''
             echo 'Build successful!'
-            ls -lh bin/1ST_READ.BIN
+            ls -lh cmake-build-dc-release/bin/1ST_READ.BIN
           "
 
         echo ""
@@ -63,25 +66,25 @@ jobs:
 
     - name: Verify build output
       run: |
-        if [ ! -f "openMenu/build/bin/1ST_READ.BIN" ]; then
+        if [ ! -f "openMenu/cmake-build-dc-release/bin/1ST_READ.BIN" ]; then
           echo "ERROR: 1ST_READ.BIN not found!"
           exit 1
         fi
 
         echo "Build artifact found:"
-        ls -lh openMenu/build/bin/1ST_READ.BIN
+        ls -lh openMenu/cmake-build-dc-release/bin/1ST_READ.BIN
 
         echo ""
         echo "File details:"
-        file openMenu/build/bin/1ST_READ.BIN
+        file openMenu/cmake-build-dc-release/bin/1ST_READ.BIN
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
       with:
         name: openmenu-dreamcast-dcnow
         path: |
-          openMenu/build/bin/1ST_READ.BIN
-          openMenu/build/bin/*.elf
+          openMenu/cmake-build-dc-release/bin/1ST_READ.BIN
+          openMenu/cmake-build-dc-release/bin/*.elf
         if-no-files-found: error
         retention-days: 90
 
@@ -106,5 +109,5 @@ jobs:
         echo "4. Press L+R triggers to activate DC Now" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
 
-        FILE_SIZE=$(stat -c%s openMenu/build/bin/1ST_READ.BIN)
+        FILE_SIZE=$(stat -c%s openMenu/cmake-build-dc-release/bin/1ST_READ.BIN)
         echo "**Binary size:** $(numfmt --to=iec-i --suffix=B $FILE_SIZE)" >> $GITHUB_STEP_SUMMARY
