@@ -31,6 +31,7 @@
 #include "ui/ui_common.h"
 #include "ui/ui_menu_credits.h"
 #include "vm2/vm2_api.h"
+#include "dcnow/dcnow_net_init.h"
 
 /* UI Collection */
 #include "ui/ui_grid.h"
@@ -439,6 +440,16 @@ main(int argc, char* argv[]) {
         puts("Init error.");
         savefile_close();
         return 1;
+    }
+
+    /* Initialize network for DC Now feature (if available) */
+    /* This will auto-detect BBA or attempt DreamPi dial-up */
+    /* Failure is non-fatal - DC Now just won't be available */
+    int net_result = dcnow_net_early_init();
+    if (net_result < 0) {
+        printf("Network init result: %d (DC Now feature unavailable)\n", net_result);
+    } else {
+        printf("Network initialized successfully (DC Now feature available)\n");
     }
 
     for (;;) {

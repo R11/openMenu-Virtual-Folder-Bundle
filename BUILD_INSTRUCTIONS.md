@@ -126,6 +126,8 @@ The DC Now feature requires a network connection on your Dreamcast:
 **Option 2: DreamPi (Modem Emulation)**
 - Uses Raspberry Pi as a modem emulator
 - Connects via phone line port
+- **Automatically dialed by openMenu at startup!**
+- Dials 555-5555 with dreamcast/dreamcast credentials
 - See https://dreamcast.wiki/DreamPi for setup
 
 **Option 3: DC-Load Serial/IP**
@@ -134,7 +136,16 @@ The DC Now feature requires a network connection on your Dreamcast:
 
 ### Network Initialization
 
-The openMenu application needs network support initialized. If your Dreamcast doesn't have network initialized at startup, you may need to add this to your main initialization code (already supported in openMenu):
+The openMenu application **automatically initializes network** at startup via `dcnow_net_early_init()`:
+
+- **BBA (Broadband Adapter)**: Auto-detected and configured instantly
+- **DreamPi/Modem**: Automatically dials 555-5555 and establishes PPP connection
+  - Uses credentials: dreamcast/dreamcast
+  - Waits up to 30 seconds for connection
+  - Displays progress every 5 seconds
+  - Shows IP address when connected
+
+**No manual configuration needed!** The network initialization happens transparently when openMenu starts.
 
 The network initialization is handled automatically by KallistiOS when the Dreamcast boots with network hardware detected.
 

@@ -4,9 +4,11 @@
 #include <stdio.h>
 
 #ifdef _arch_dreamcast
+#include <kos.h>
 #include <kos/net.h>
 #include <kos/thread.h>
 #include <arch/timer.h>
+#include <dc/modem/modem.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -25,13 +27,61 @@ int dcnow_init(void) {
     memset(&cached_data, 0, sizeof(cached_data));
     cache_valid = false;
 
-    /* Initialize KOS network subsystem if not already initialized */
-    if (!network_initialized) {
-        /* Note: net_init() should have been called at startup */
-        /* We'll just mark it as ready */
-        network_initialized = true;
+    if (network_initialized) {
+        return 0;  /* Already initialized */
     }
 
+    /* Initialize KOS network subsystem */
+    /* This auto-detects BBA or modem and initializes appropriately */
+    printf("DC Now: Initializing network...\n");
+
+    if (net_init() < 0) {
+        printf("DC Now: Network initialization failed\n");
+        return -1;
+    }
+
+    /* Wait a moment for network to stabilize */
+    thd_sleep(500);  /* 500ms */
+
+    /* Check if we have a valid network device */
+    /* net_default_dev should be set by net_init() */
+    if (!net_default_dev) {
+        printf("DC Now: No network device found\n");
+        printf("DC Now: Make sure BBA is connected or modem is configured\n");
+        return -2;
+    }
+
+    printf("DC Now: Network device: %s\n", net_default_dev->name);
+
+    /* For modem/DreamPi: Check if PPP is configured */
+    if (strncmp(net_default_dev->name, "ppp", 3) == 0) {
+        printf("DC Now: Modem/DreamPi detected\n");
+        printf("DC Now: Note: Modem must be configured via modem_init() before openMenu starts\n");
+        /* The modem should already be initialized and connected by this point */
+        /* If not, we'll get connection errors when trying to use sockets */
+    }
+    /* For BBA: Should be auto-configured by net_init() */
+    else if (strncmp(net_default_dev->name, "bba", 3) == 0) {
+        printf("DC Now: Broadband Adapter detected\n");
+    }
+
+    /* Wait for link to be established */
+    int retry = 0;
+    while (retry < 20) {  /* 10 seconds max */
+        if (net_default_dev->if_flags & NETIF_FLAG_LINK_UP) {
+            break;
+        }
+        thd_sleep(500);
+        retry++;
+    }
+
+    if (!(net_default_dev->if_flags & NETIF_FLAG_LINK_UP)) {
+        printf("DC Now: Network link not established\n");
+        return -3;
+    }
+
+    printf("DC Now: Network link up\n");
+    network_initialized = true;
     return 0;
 #else
     /* Non-Dreamcast platforms - just initialize cache */
@@ -60,19 +110,20 @@ static int http_get_request(const char* hostname, const char* path, char* respon
     /* Create socket */
     sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock < 0) {
+        printf("DC Now: Socket creation failed (errno: %d)\n", errno);
         return -2;  /* Socket creation failed */
     }
 
-    /* Set socket to non-blocking for timeout support */
-    int flags = 1;
-    setsockopt(sock, SOL_SOCKET, SO_NONBLOCK, &flags, sizeof(flags));
-
     /* Resolve hostname */
+    printf("DC Now: Resolving %s...\n", hostname);
     host = gethostbyname(hostname);
     if (!host) {
+        printf("DC Now: DNS lookup failed for %s\n", hostname);
         close(sock);
         return -3;  /* DNS resolution failed */
     }
+
+    printf("DC Now: Resolved to %s\n", inet_ntoa(*(struct in_addr*)host->h_addr));
 
     /* Setup server address */
     memset(&server_addr, 0, sizeof(server_addr));
@@ -80,38 +131,21 @@ static int http_get_request(const char* hostname, const char* path, char* respon
     server_addr.sin_port = htons(80);
     memcpy(&server_addr.sin_addr, host->h_addr, host->h_length);
 
-    /* Connect with timeout */
+    /* Connect to server */
+    printf("DC Now: Connecting...\n");
     start_time = timer_ms_gettime64();
     timeout_ticks = timeout_ms;
 
     int connect_result = connect(sock, (struct sockaddr*)&server_addr, sizeof(server_addr));
 
-    /* Wait for connection with timeout */
-    while (connect_result < 0) {
-        if (timer_ms_gettime64() - start_time > timeout_ticks) {
-            close(sock);
-            return -4;  /* Connection timeout */
-        }
-
-        /* Check if connection is established */
-        fd_set write_fds;
-        struct timeval tv;
-        FD_ZERO(&write_fds);
-        FD_SET(sock, &write_fds);
-        tv.tv_sec = 0;
-        tv.tv_usec = 100000;  /* 100ms */
-
-        int sel_result = select(sock + 1, NULL, &write_fds, NULL, &tv);
-        if (sel_result > 0 && FD_ISSET(sock, &write_fds)) {
-            /* Connection established */
-            break;
-        } else if (sel_result < 0) {
-            close(sock);
-            return -4;  /* Connection failed */
-        }
-
-        thd_pass();  /* Yield to other threads */
+    if (connect_result < 0) {
+        /* For blocking sockets, connect should succeed or fail immediately on Dreamcast */
+        printf("DC Now: Connection failed (errno: %d)\n", errno);
+        close(sock);
+        return -4;
     }
+
+    printf("DC Now: Connected\n");
 
     /* Build HTTP GET request */
     snprintf(request_buf, sizeof(request_buf),
@@ -124,47 +158,44 @@ static int http_get_request(const char* hostname, const char* path, char* respon
              path, hostname);
 
     /* Send request */
+    printf("DC Now: Sending request...\n");
     int sent = send(sock, request_buf, strlen(request_buf), 0);
     if (sent <= 0) {
+        printf("DC Now: Send failed (errno: %d)\n", errno);
         close(sock);
         return -5;  /* Send failed */
     }
 
-    /* Receive response with timeout */
+    printf("DC Now: Request sent, waiting for response...\n");
+
+    /* Receive response */
     start_time = timer_ms_gettime64();
     total_received = 0;
 
     while (total_received < buf_size - 1) {
         if (timer_ms_gettime64() - start_time > timeout_ticks) {
+            printf("DC Now: Receive timeout\n");
             break;  /* Timeout - but we may have received some data */
         }
 
-        fd_set read_fds;
-        struct timeval tv;
-        FD_ZERO(&read_fds);
-        FD_SET(sock, &read_fds);
-        tv.tv_sec = 0;
-        tv.tv_usec = 100000;  /* 100ms */
+        int received = recv(sock, response_buf + total_received,
+                           buf_size - total_received - 1, 0);
 
-        int sel_result = select(sock + 1, &read_fds, NULL, NULL, &tv);
-        if (sel_result > 0 && FD_ISSET(sock, &read_fds)) {
-            int received = recv(sock, response_buf + total_received,
-                               buf_size - total_received - 1, 0);
-
-            if (received > 0) {
-                total_received += received;
-                start_time = timer_ms_gettime64();  /* Reset timeout on successful receive */
-            } else if (received == 0) {
-                /* Connection closed by server - this is normal after receiving all data */
-                break;
-            } else {
-                /* Error receiving */
-                if (total_received == 0) {
-                    close(sock);
-                    return -6;  /* Receive failed */
-                }
-                break;  /* We got some data, so continue */
+        if (received > 0) {
+            total_received += received;
+            start_time = timer_ms_gettime64();  /* Reset timeout on successful receive */
+        } else if (received == 0) {
+            /* Connection closed by server - this is normal */
+            printf("DC Now: Server closed connection\n");
+            break;
+        } else {
+            /* Error receiving */
+            if (total_received == 0) {
+                printf("DC Now: Receive failed (errno: %d)\n", errno);
+                close(sock);
+                return -6;  /* Receive failed */
             }
+            break;  /* We got some data, so continue */
         }
 
         thd_pass();  /* Yield to other threads */
@@ -172,6 +203,8 @@ static int http_get_request(const char* hostname, const char* path, char* respon
 
     response_buf[total_received] = '\0';
     close(sock);
+
+    printf("DC Now: Received %d bytes\n", total_received);
 
     return (total_received > 0) ? total_received : -6;
 }
@@ -186,8 +219,17 @@ int dcnow_fetch_data(dcnow_data_t *data, uint32_t timeout_ms) {
     memset(data, 0, sizeof(dcnow_data_t));
 
 #ifdef _arch_dreamcast
+    /* Check if network is initialized */
+    if (!network_initialized) {
+        strcpy(data->error_message, "Network not initialized");
+        data->data_valid = false;
+        return -11;
+    }
+
     char response[8192];
     int result;
+
+    printf("DC Now: Fetching data from dreamcast.online/now...\n");
 
     /* Perform HTTP GET request */
     result = http_get_request("dreamcast.online", "/now", response, sizeof(response), timeout_ms);
@@ -197,11 +239,12 @@ int dcnow_fetch_data(dcnow_data_t *data, uint32_t timeout_ms) {
         switch (result) {
             case -2: strcpy(data->error_message, "Socket creation failed"); break;
             case -3: strcpy(data->error_message, "DNS lookup failed"); break;
-            case -4: strcpy(data->error_message, "Connection failed/timeout"); break;
+            case -4: strcpy(data->error_message, "Connection failed"); break;
             case -5: strcpy(data->error_message, "Failed to send request"); break;
             case -6: strcpy(data->error_message, "Failed to receive data"); break;
             default: strcpy(data->error_message, "Network error"); break;
         }
+        printf("DC Now: Error - %s\n", data->error_message);
         data->data_valid = false;
         return result;
     }
@@ -211,6 +254,7 @@ int dcnow_fetch_data(dcnow_data_t *data, uint32_t timeout_ms) {
     if (!json_start) {
         strcpy(data->error_message, "Invalid HTTP response");
         data->data_valid = false;
+        printf("DC Now: Invalid HTTP response\n");
         return -7;
     }
     json_start += 4;  /* Skip the \r\n\r\n */
@@ -227,24 +271,32 @@ int dcnow_fetch_data(dcnow_data_t *data, uint32_t timeout_ms) {
                 snprintf(data->error_message, sizeof(data->error_message),
                         "HTTP error %d", status_code);
                 data->data_valid = false;
+                printf("DC Now: HTTP error %d\n", status_code);
                 return -8;
             }
         }
     }
+
+    printf("DC Now: Parsing JSON...\n");
 
     /* Parse JSON */
     json_dcnow_t json_result;
     if (!dcnow_json_parse(json_start, &json_result)) {
         strcpy(data->error_message, "JSON parse error");
         data->data_valid = false;
+        printf("DC Now: JSON parse failed\n");
         return -9;
     }
 
     if (!json_result.valid) {
         strcpy(data->error_message, "Invalid JSON data");
         data->data_valid = false;
+        printf("DC Now: Invalid JSON data\n");
         return -10;
     }
+
+    printf("DC Now: Successfully parsed %d games, %d total players\n",
+           json_result.game_count, json_result.total_players);
 
     /* Copy parsed data to result structure */
     data->total_players = json_result.total_players;
@@ -255,6 +307,8 @@ int dcnow_fetch_data(dcnow_data_t *data, uint32_t timeout_ms) {
         data->games[i].game_name[MAX_GAME_NAME_LEN - 1] = '\0';
         data->games[i].player_count = json_result.games[i].players;
         data->games[i].is_active = (json_result.games[i].players > 0);
+        printf("DC Now:   %s - %d players\n",
+               data->games[i].game_name, data->games[i].player_count);
     }
 
     data->data_valid = true;
@@ -264,6 +318,7 @@ int dcnow_fetch_data(dcnow_data_t *data, uint32_t timeout_ms) {
     memcpy(&cached_data, data, sizeof(dcnow_data_t));
     cache_valid = true;
 
+    printf("DC Now: Data fetch complete\n");
     return 0;
 
 #else
