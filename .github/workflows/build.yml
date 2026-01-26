@@ -5,14 +5,23 @@ on: [push, pull_request]
 jobs:
   build:
     runs-on: ubuntu-latest
-    container:
-      image: nold360/kallistios-sdk:latest
 
     steps:
+      # Step 1: Run checkout on the host (not inside the old Docker container)
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # Step 2: Run the build inside the Docker container
       - name: Compile Project
         run: |
-          source /opt/toolchains/dc/kos/environ.sh
-          make
+          docker run --rm -v ${{ github.workspace }}:/src -w /src nold360/kallistios-sdk:latest /bin/bash -c "
+            source /opt/toolchains/dc/kos/environ.sh && \
+            make
+          "
+
+      # Step 3: Upload the resulting binary
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dreamcast-binary
+          path: "**/*.elf"
