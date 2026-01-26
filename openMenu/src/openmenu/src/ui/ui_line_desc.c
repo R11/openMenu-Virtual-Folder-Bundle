@@ -624,6 +624,18 @@ FUNCTION(UI_NAME, init) {
 
 static void
 handle_input_ui(enum control input) {
+    /* Check for L+R triggers pressed together to open DC Now popup */
+    if (input == TRIG_L && INPT_TriggerPressed(TRIGGER_R)) {
+        /* Both triggers pressed - open DC Now popup */
+        dcnow_setup(&draw_current, cur_theme_colors, &navigate_timeout, cur_theme_colors->menu_highlight_color);
+        return;
+    }
+    if (input == TRIG_R && INPT_TriggerPressed(TRIGGER_L)) {
+        /* Both triggers pressed - open DC Now popup */
+        dcnow_setup(&draw_current, cur_theme_colors, &navigate_timeout, cur_theme_colors->menu_highlight_color);
+        return;
+    }
+
     switch (input) {
         case LEFT: menu_decrement(1); break;
         case RIGHT: menu_increment(1); break;
@@ -678,6 +690,9 @@ FUNCTION_INPUT(UI_NAME, handle_input) {
         case DRAW_PSX_LAUNCHER: {
             handle_input_psx_launcher(input_current);
         } break;
+        case DRAW_DCNOW_PLAYERS: {
+            handle_input_dcnow(input_current);
+        } break;
         default:
         case DRAW_UI: {
             handle_input_ui(input_current);
@@ -714,6 +729,10 @@ FUNCTION(UI_NAME, drawOP) {
         case DRAW_PSX_LAUNCHER: {
             /* PSX launcher popup on top */
             draw_psx_launcher_op();
+        } break;
+        case DRAW_DCNOW_PLAYERS: {
+            /* DC Now popup on top */
+            draw_dcnow_op();
         } break;
         default:
         case DRAW_UI: {
@@ -754,6 +773,10 @@ FUNCTION(UI_NAME, drawTR) {
         case DRAW_PSX_LAUNCHER: {
             /* PSX launcher popup on top */
             draw_psx_launcher_tr();
+        } break;
+        case DRAW_DCNOW_PLAYERS: {
+            /* DC Now popup on top */
+            draw_dcnow_tr();
         } break;
         default:
         case DRAW_UI: {

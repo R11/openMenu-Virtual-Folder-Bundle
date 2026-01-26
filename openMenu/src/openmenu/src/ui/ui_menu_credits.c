@@ -1733,3 +1733,279 @@ draw_psx_launcher_tr(void) {
         font_bmf_draw(x_item, cur_y, psx_launcher_choice == 2 ? highlight_color : text_color, "Close");
     }
 }
+
+/*
+ * DC Now (dreamcast.online/now) Player Status Popup
+ */
+#include "../dcnow/dcnow_api.h"
+
+static dcnow_data_t dcnow_data;
+static int dcnow_choice = 0;
+static bool dcnow_data_fetched = false;
+static bool dcnow_is_loading = false;
+
+void
+dcnow_setup(enum draw_state* state, struct theme_color* _colors, int* timeout_ptr, uint32_t title_color) {
+    popup_setup(state, _colors, timeout_ptr, title_color);
+    dcnow_choice = 0;
+
+    /* Try to fetch data if we haven't already */
+    if (!dcnow_data_fetched && !dcnow_is_loading) {
+        dcnow_is_loading = true;
+
+        /* Attempt to fetch fresh data from dreamcast.online/now
+         * This will use stub data if DCNOW_USE_STUB_DATA is defined,
+         * otherwise it will fail with "not implemented" error */
+        int result = dcnow_fetch_data(&dcnow_data, 5000);  /* 5 second timeout */
+
+        if (result == 0) {
+            dcnow_data_fetched = true;
+        } else {
+            /* Failed to fetch - try to use cached data */
+            if (!dcnow_get_cached_data(&dcnow_data)) {
+                /* No cached data available, show error */
+                memset(&dcnow_data, 0, sizeof(dcnow_data));
+                strcpy(dcnow_data.error_message, "Network error - cannot connect");
+                dcnow_data.data_valid = false;
+            }
+        }
+
+        dcnow_is_loading = false;
+    }
+}
+
+void
+handle_input_dcnow(enum control input) {
+    switch (input) {
+        case BTN_A: {
+            /* Close popup on A button */
+            *state_ptr = DRAW_UI;
+        } break;
+        case BTN_B: {
+            /* Close popup on B button */
+            *state_ptr = DRAW_UI;
+        } break;
+        case BTN_START: {
+            /* Refresh data on START button */
+            dcnow_data_fetched = false;
+            dcnow_is_loading = true;
+
+            int result = dcnow_fetch_data(&dcnow_data, 5000);
+            if (result == 0) {
+                dcnow_data_fetched = true;
+            }
+
+            dcnow_is_loading = false;
+        } break;
+        case DIR_UP: {
+            /* Scroll up through game list */
+            if (dcnow_data.data_valid && dcnow_choice > 0) {
+                dcnow_choice--;
+            }
+        } break;
+        case DIR_DOWN: {
+            /* Scroll down through game list */
+            if (dcnow_data.data_valid && dcnow_choice < dcnow_data.game_count) {
+                dcnow_choice++;
+            }
+        } break;
+        default:
+            break;
+    }
+}
+
+void
+draw_dcnow_op(void) { /* Opaque pass - nothing to draw */ }
+
+void
+draw_dcnow_tr(void) {
+    z_set_cond(205.0f);
+
+    if (sf_ui[0] == UI_SCROLL || sf_ui[0] == UI_FOLDERS) {
+        /* Scroll/Folders mode - use bitmap font */
+        const int line_height = 20;
+        const int title_gap = line_height;
+        const int padding = 16;
+        const int max_visible_games = 10;  /* Show at most 10 games at once */
+
+        /* Calculate width based on content */
+        int max_line_len = 30;  /* "Dreamcast Live - Online Now" */
+        if (dcnow_data.data_valid) {
+            for (int i = 0; i < dcnow_data.game_count; i++) {
+                int len = strlen(dcnow_data.games[i].game_name) + 10;  /* name + " - 999 players" */
+                if (len > max_line_len) {
+                    max_line_len = len;
+                }
+            }
+        } else {
+            int err_len = strlen(dcnow_data.error_message);
+            if (err_len > max_line_len) {
+                max_line_len = err_len;
+            }
+        }
+
+        const int width = max_line_len * 8 + padding;
+
+        int num_lines = 2;  /* Title + total players line */
+        if (dcnow_data.data_valid) {
+            num_lines += (dcnow_data.game_count < max_visible_games ? dcnow_data.game_count : max_visible_games);
+            num_lines++;  /* Close button */
+        } else {
+            num_lines += 2;  /* Error message + close button */
+        }
+
+        const int height = num_lines * line_height + title_gap;
+        const int x = (640 / 2) - (width / 2);
+        const int y = (480 / 2) - (height / 2);
+        const int x_item = x + (padding / 2);
+
+        draw_popup_menu(x, y, width, height);
+
+        int cur_y = y + 2;
+        font_bmp_begin_draw();
+        font_bmp_set_color(menu_title_color);
+
+        /* Title */
+        const char* title = "Dreamcast Live - Online Now";
+        int title_x = x + (width / 2) - ((strlen(title) * 8) / 2);
+        font_bmp_draw_main(title_x, cur_y, title);
+
+        cur_y += title_gap;
+
+        if (dcnow_is_loading) {
+            /* Show loading message */
+            font_bmp_set_color(text_color);
+            font_bmp_draw_main(x_item, cur_y, "Loading...");
+            cur_y += line_height;
+        } else if (dcnow_data.data_valid) {
+            /* Show total players */
+            char total_buf[64];
+            snprintf(total_buf, sizeof(total_buf), "Total Active Players: %d", dcnow_data.total_players);
+            font_bmp_set_color(text_color);
+            font_bmp_draw_main(x_item, cur_y, total_buf);
+            cur_y += line_height;
+
+            /* Show game list */
+            if (dcnow_data.game_count == 0) {
+                font_bmp_set_color(text_color);
+                font_bmp_draw_main(x_item, cur_y, "No active games");
+                cur_y += line_height;
+            } else {
+                for (int i = 0; i < dcnow_data.game_count && i < max_visible_games; i++) {
+                    char game_buf[128];
+                    const char* status = dcnow_data.games[i].is_active ? "" : " (offline)";
+
+                    if (dcnow_data.games[i].player_count == 1) {
+                        snprintf(game_buf, sizeof(game_buf), "%s - %d player%s",
+                                 dcnow_data.games[i].game_name,
+                                 dcnow_data.games[i].player_count,
+                                 status);
+                    } else {
+                        snprintf(game_buf, sizeof(game_buf), "%s - %d players%s",
+                                 dcnow_data.games[i].game_name,
+                                 dcnow_data.games[i].player_count,
+                                 status);
+                    }
+
+                    font_bmp_set_color(i == dcnow_choice ? highlight_color : text_color);
+                    font_bmp_draw_main(x_item, cur_y, game_buf);
+                    cur_y += line_height;
+                }
+            }
+        } else {
+            /* Show error message */
+            font_bmp_set_color(text_color);
+            font_bmp_draw_main(x_item, cur_y, dcnow_data.error_message);
+            cur_y += line_height;
+            font_bmp_draw_main(x_item, cur_y, "Press START to retry");
+            cur_y += line_height;
+        }
+
+        /* Close button */
+        font_bmp_set_color(dcnow_choice == dcnow_data.game_count ? highlight_color : text_color);
+        font_bmp_draw_main(x_item, cur_y, "Close");
+
+    } else {
+        /* LineDesc/Grid modes - use vector font */
+        const int line_height = 28;
+        const int title_gap = line_height / 2;
+        const int padding = 20;
+        const int max_visible_games = 8;
+
+        /* Calculate width based on content */
+        int max_line_len = 300;  /* Title width estimate */
+
+        int num_lines = 2;  /* Title + total */
+        if (dcnow_data.data_valid) {
+            num_lines += (dcnow_data.game_count < max_visible_games ? dcnow_data.game_count : max_visible_games);
+            num_lines++;  /* Close */
+        } else {
+            num_lines += 2;  /* Error + retry hint */
+        }
+
+        const int width = max_line_len + padding;
+        const int height = num_lines * line_height + title_gap;
+        const int x = (640 / 2) - (width / 2);
+        const int y = (480 / 2) - (height / 2);
+        const int x_item = x + 10;
+
+        draw_popup_menu(x, y, width, height);
+
+        int cur_y = y + 2;
+        font_bmf_begin_draw();
+        font_bmf_set_height_default();
+
+        /* Title */
+        font_bmf_draw_centered(x + width / 2, cur_y, text_color, "Dreamcast Live - Online Now");
+        cur_y += title_gap;
+
+        if (dcnow_is_loading) {
+            cur_y += line_height;
+            font_bmf_draw(x_item, cur_y, text_color, "Loading...");
+        } else if (dcnow_data.data_valid) {
+            /* Total players */
+            cur_y += line_height;
+            char total_buf[64];
+            snprintf(total_buf, sizeof(total_buf), "Total Active Players: %d", dcnow_data.total_players);
+            font_bmf_draw(x_item, cur_y, text_color, total_buf);
+
+            /* Game list */
+            if (dcnow_data.game_count == 0) {
+                cur_y += line_height;
+                font_bmf_draw(x_item, cur_y, text_color, "No active games");
+            } else {
+                for (int i = 0; i < dcnow_data.game_count && i < max_visible_games; i++) {
+                    cur_y += line_height;
+                    char game_buf[128];
+                    const char* status = dcnow_data.games[i].is_active ? "" : " (offline)";
+
+                    if (dcnow_data.games[i].player_count == 1) {
+                        snprintf(game_buf, sizeof(game_buf), "%s - %d player%s",
+                                 dcnow_data.games[i].game_name,
+                                 dcnow_data.games[i].player_count,
+                                 status);
+                    } else {
+                        snprintf(game_buf, sizeof(game_buf), "%s - %d players%s",
+                                 dcnow_data.games[i].game_name,
+                                 dcnow_data.games[i].player_count,
+                                 status);
+                    }
+
+                    uint32_t color = (i == dcnow_choice) ? highlight_color : text_color;
+                    font_bmf_draw_auto_size(x_item, cur_y, color, game_buf, width - 20);
+                }
+            }
+        } else {
+            /* Error */
+            cur_y += line_height;
+            font_bmf_draw(x_item, cur_y, text_color, dcnow_data.error_message);
+            cur_y += line_height;
+            font_bmf_draw(x_item, cur_y, text_color, "Press START to retry");
+        }
+
+        /* Close */
+        cur_y += line_height;
+        uint32_t close_color = (dcnow_choice == dcnow_data.game_count) ? highlight_color : text_color;
+        font_bmf_draw(x_item, cur_y, close_color, "Close");
+    }
+}
