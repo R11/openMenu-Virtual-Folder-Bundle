@@ -355,6 +355,11 @@ int dcnow_fetch_data(dcnow_data_t *data, uint32_t timeout_ms) {
     }
     json_start += 4;  /* Skip the \r\n\r\n */
 
+    /* DEBUG: Print the actual JSON we received */
+    printf("DC Now: ========== RAW JSON START ==========\n");
+    printf("%s\n", json_start);
+    printf("DC Now: ========== RAW JSON END ==========\n");
+
     /* Check for HTTP error status */
     if (strncmp(response, "HTTP/1.", 7) == 0) {
         /* Extract status code */
