@@ -45,6 +45,9 @@
 #include "bloader.h"
 #include "texture/txr_manager.h"
 
+/* Initialize KOS with network support - CRITICAL for socket() to work! */
+KOS_INIT_FLAGS(INIT_DEFAULT | INIT_NET);
+
 /* VM2/VMUPro/USB4Maple device tracking */
 #define VM2_MAX_DEVICES 8
 maple_device_t* vm2_devices[VM2_MAX_DEVICES] = {NULL};
