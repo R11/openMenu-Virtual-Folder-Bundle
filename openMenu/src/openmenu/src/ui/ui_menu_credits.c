@@ -1783,55 +1783,43 @@ static char connection_status[128] = "";
 
 /* Visual callback for network connection status - renders full scene */
 static void dcnow_connection_status_callback(const char* message) {
-    int i;
+    /* Render a single frame with the status message */
+    pvr_wait_ready();
+    pvr_scene_begin();
 
-    /* Try rendering multiple frames to ensure visibility */
-    for (i = 0; i < 3; i++) {
-        pvr_wait_ready();
-        pvr_scene_begin();
+    /* Opaque pass - draw dark background  */
+    draw_set_list(PVR_LIST_OP_POLY);
+    pvr_list_begin(PVR_LIST_OP_POLY);
 
-        /* Opaque pass - clear screen with dark background */
-        draw_set_list(PVR_LIST_OP_POLY);
-        pvr_list_begin(PVR_LIST_OP_POLY);
+    /* Full screen dark background */
+    draw_draw_quad(0, 0, 640, 480, 0xFF202020);
 
-        /* Full screen dark background */
-        draw_draw_quad(0, 0, 640, 480, 0xFF101010);
+    pvr_list_finish();
 
-        pvr_list_finish();
+    /* Transparent pass - draw status box and text */
+    draw_set_list(PVR_LIST_TR_POLY);
+    pvr_list_begin(PVR_LIST_TR_POLY);
 
-        /* Transparent pass - draw status box */
-        draw_set_list(PVR_LIST_TR_POLY);
-        pvr_list_begin(PVR_LIST_TR_POLY);
+    /* White border box */
+    const int border_width = 4;
+    draw_draw_quad(140 - border_width, 190 - border_width,
+                   360 + (2 * border_width), 100 + (2 * border_width),
+                   0xFFFFFFFF);
 
-        /* Bright cyan box for visibility */
-        draw_draw_quad(160, 200, 320, 80, 0xFF00FFFF);
+    /* Black background box */
+    draw_draw_quad(140, 190, 360, 100, 0xFF000000);
 
-        /* White border on top */
-        const int border_width = 2;
-        draw_draw_quad(160 - border_width, 200 - border_width,
-                       320 + (2 * border_width), border_width, 0xFFFFFFFF);
-        draw_draw_quad(160 - border_width, 200 - border_width,
-                       border_width, 80 + (2 * border_width), 0xFFFFFFFF);
-        draw_draw_quad(160 - border_width, 200 + 80,
-                       320 + (2 * border_width), border_width, 0xFFFFFFFF);
-        draw_draw_quad(160 + 320, 200 - border_width,
-                       border_width, 80 + (2 * border_width), 0xFFFFFFFF);
+    /* Draw text - white on black */
+    font_bmp_begin_draw();
+    font_bmp_set_color(0xFFFFFFFF);
+    font_bmp_draw_centered(320, 215, "DC Now");
+    font_bmp_draw_centered(320, 240, message);
 
-        /* Draw text */
-        font_bmf_begin_draw();
-        font_bmf_set_height_default();
-        font_bmf_draw_centered(320, 215, 0xFF000000, "DC Now - Connecting");
-        font_bmf_draw_centered(320, 240, 0xFF000000, message);
+    pvr_list_finish();
+    pvr_scene_finish();
 
-        pvr_list_finish();
-        pvr_scene_finish();
-
-        /* Small delay between frames */
-        timer_spin_sleep(16);  /* ~60fps */
-    }
-
-    /* Hold final frame for visibility */
-    timer_spin_sleep(500);
+    /* Hold frame so it's visible */
+    timer_spin_sleep(600);
 }
 
 void
