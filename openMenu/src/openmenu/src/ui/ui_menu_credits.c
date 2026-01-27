@@ -1916,8 +1916,16 @@ handle_input_dcnow(enum control input) {
                 } else {
                     printf("DC Now: Connection successful\n");
 
+                    /* Show visible status during I/O initialization */
+                    dcnow_connection_status_callback("Initializing I/O layer...");
+                    thd_sleep(1000);
+                    dcnow_connection_status_callback("Waiting for socket layer (4s)...");
+                    thd_sleep(4000);
+                    dcnow_connection_status_callback("Priming sockets...");
+
                     /* Initialize DC Now API layer */
                     int api_result = dcnow_init();
+
                     if (api_result < 0) {
                         printf("DC Now: API init failed: %d\n", api_result);
                         memset(&dcnow_data, 0, sizeof(dcnow_data));
