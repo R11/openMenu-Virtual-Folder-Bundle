@@ -60,7 +60,10 @@ int dcnow_init(void) {
         printf("DC Now: Using %s\n", net_default_dev->name);
     }
 
-    /* ClassiCube doesn't wait after PPP - try socket immediately */
+    /* Brief delay to let PPP I/O layer settle (EIO errno 5 if too fast) */
+    printf("DC Now: Waiting for I/O layer (2 seconds)...\n");
+    thd_sleep(2000);
+
     printf("DC Now: Ready to create sockets\n");
     network_initialized = true;
     return 0;
@@ -131,6 +134,7 @@ static int http_get_request(const char* hostname, const char* path, char* respon
         }
 
         switch (errno) {
+            case EIO: printf("DC Now: I/O error - network device not ready\n"); break;
             case EPROTONOSUPPORT: printf("DC Now: Protocol not supported\n"); break;
             case EMFILE: printf("DC Now: Too many open files\n"); break;
             case ENFILE: printf("DC Now: System file table full\n"); break;
@@ -299,6 +303,7 @@ int dcnow_fetch_data(dcnow_data_t *data, uint32_t timeout_ms) {
                 /* Include errno if available */
                 if (last_socket_errno != 0) {
                     switch(last_socket_errno) {
+                        case EIO: errno_str = "I/O error"; break;
                         case EPROTONOSUPPORT: errno_str = "Proto not supported"; break;
                         case EMFILE: errno_str = "Too many files"; break;
                         case ENFILE: errno_str = "System table full"; break;
