@@ -1781,32 +1781,28 @@ static bool dcnow_is_loading = false;
 static bool dcnow_net_initialized = false;
 static char connection_status[128] = "";
 
-/* Visual callback for network connection status */
+/* Visual callback for network connection status - called FROM update_status() in dcnow_net_init.c */
+/* NOTE: This is called INSIDE a pvr_scene_begin/finish from update_status(), so DON'T call them again */
 static void dcnow_connection_status_callback(const char* message) {
-    /* Store the message for rendering */
-    strncpy(connection_status, message, sizeof(connection_status) - 1);
-    connection_status[sizeof(connection_status) - 1] = '\0';
+    /* Draw transparent background overlay */
+    draw_set_list(PVR_LIST_TR_POLY);
+    pvr_list_begin(PVR_LIST_TR_POLY);
 
-    /* Draw a status box in center of screen */
-    pvr_wait_ready();
-    pvr_scene_begin();
-
-    /* White border (draw larger box first) */
+    /* Semi-transparent black background */
     const int border_width = 2;
     draw_draw_quad(160 - border_width, 200 - border_width,
                    320 + (2 * border_width), 80 + (2 * border_width),
-                   0xFFFFFFFF);
+                   0xFFFFFFFF);  /* White border */
 
-    /* Black background (draw smaller box on top) */
-    draw_draw_quad(160, 200, 320, 80, 0xFF000000);
+    draw_draw_quad(160, 200, 320, 80, 0xFF000000);  /* Black background */
 
-    /* Title */
+    /* Draw text */
+    font_bmf_begin_draw();
+    font_bmf_set_height_default();
     font_bmf_draw_centered(320, 215, 0xFFFFFFFF, "DC Now - Connecting");
+    font_bmf_draw_centered(320, 240, 0xFFFFFF00, message);  /* Yellow status */
 
-    /* Status message */
-    font_bmf_draw_centered(320, 245, 0xFFFFFF00, message);  /* Yellow */
-
-    pvr_scene_finish();
+    pvr_list_finish();
 }
 
 void
@@ -1883,11 +1879,15 @@ handle_input_dcnow(enum control input) {
         case A: {
             /* A button: Connect or Refresh */
             if (!dcnow_net_initialized) {
-                /* Connect to DreamPi */
+                /* Connect to DreamPi - SET CALLBACK FOR VISUAL FEEDBACK */
                 printf("DC Now: Starting connection...\n");
+                dcnow_set_status_callback(dcnow_connection_status_callback);
 
-                /* Initialize network/modem */
+                /* Initialize network/modem - this will show status messages via callback */
                 int net_result = dcnow_net_early_init();
+
+                /* Clear callback after connection attempt */
+                dcnow_set_status_callback(NULL);
 
                 if (net_result < 0) {
                     printf("DC Now: Connection failed: %d\n", net_result);
@@ -1904,7 +1904,8 @@ handle_input_dcnow(enum control input) {
                     if (api_result < 0) {
                         printf("DC Now: API init failed: %d\n", api_result);
                         memset(&dcnow_data, 0, sizeof(dcnow_data));
-                        strcpy(dcnow_data.error_message, "API initialization failed");
+                        snprintf(dcnow_data.error_message, sizeof(dcnow_data.error_message),
+                                "Init failed (error %d)", api_result);
                         dcnow_data.data_valid = false;
                     } else {
                         printf("DC Now: API ready, fetching data...\n");
@@ -1917,6 +1918,7 @@ handle_input_dcnow(enum control input) {
                             printf("DC Now: Data fetched successfully\n");
                         } else {
                             printf("DC Now: Data fetch failed: %d\n", result);
+                            /* error_message already set by dcnow_fetch_data */
                         }
                         dcnow_is_loading = false;
                     }

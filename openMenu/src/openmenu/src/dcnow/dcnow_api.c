@@ -91,24 +91,36 @@ static int http_get_request(const char* hostname, const char* path, char* respon
 
     /* Verify network is still available */
     if (!net_default_dev) {
-        printf("DC Now: Network device disappeared\n");
+        printf("DC Now: ERROR - Network device disappeared\n");
         return -2;
     }
 
-    /* Create socket */
-    printf("DC Now: Creating socket...\n");
-    sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    printf("DC Now: About to create socket...\n");
+    printf("DC Now: Device: %s, IP: %d.%d.%d.%d\n",
+           net_default_dev->name,
+           net_default_dev->ip_addr[0],
+           net_default_dev->ip_addr[1],
+           net_default_dev->ip_addr[2],
+           net_default_dev->ip_addr[3]);
+
+    /* Create socket - use 0 for default protocol (TCP for SOCK_STREAM) */
+    sock = socket(AF_INET, SOCK_STREAM, 0);
+
     if (sock < 0) {
-        printf("DC Now: Socket creation failed (sock=%d, errno=%d)\n", sock, errno);
-        printf("DC Now: Network device: %s, IP: %d.%d.%d.%d\n",
-               net_default_dev->name,
-               net_default_dev->ip_addr[0],
-               net_default_dev->ip_addr[1],
-               net_default_dev->ip_addr[2],
-               net_default_dev->ip_addr[3]);
+        printf("DC Now: ERROR - socket() returned %d, errno=%d\n", sock, errno);
+        switch (errno) {
+            case EPROTONOSUPPORT: printf("DC Now: Protocol not supported\n"); break;
+            case EMFILE: printf("DC Now: Too many open files\n"); break;
+            case ENFILE: printf("DC Now: System file table full\n"); break;
+            case EACCES: printf("DC Now: Permission denied\n"); break;
+            case ENOBUFS: printf("DC Now: No buffer space available\n"); break;
+            case ENOMEM: printf("DC Now: Out of memory\n"); break;
+            default: printf("DC Now: Unknown socket error\n"); break;
+        }
         return -2;  /* Socket creation failed */
     }
-    printf("DC Now: Socket created (fd=%d)\n", sock);
+
+    printf("DC Now: Socket created successfully (fd=%d)\n", sock);
 
     /* Resolve hostname */
     printf("DC Now: Resolving %s...\n", hostname);
