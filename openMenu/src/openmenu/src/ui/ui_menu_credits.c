@@ -1918,9 +1918,9 @@ handle_input_dcnow(enum control input) {
 
                     /* Show visible status during I/O initialization */
                     dcnow_connection_status_callback("Initializing I/O layer...");
-                    thd_sleep(1000);
-                    dcnow_connection_status_callback("Waiting for socket layer (4s)...");
-                    thd_sleep(4000);
+                    thd_sleep(2000);
+                    dcnow_connection_status_callback("Waiting for socket layer...");
+                    thd_sleep(8000);  /* Total 10 seconds */
                     dcnow_connection_status_callback("Priming sockets...");
 
                     /* Initialize DC Now API layer */

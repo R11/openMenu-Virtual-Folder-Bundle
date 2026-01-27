@@ -60,18 +60,33 @@ int dcnow_init(void) {
         printf("DC Now: Using %s\n", net_default_dev->name);
     }
 
-    /* Note: The UI layer handles the I/O initialization delay with visual feedback */
-    /* We just prime the socket layer here */
+    /* Note: The UI layer handles the initial 10-second delay with visual feedback */
+    /* Now retry socket creation with additional delays if needed */
 
-    /* Try to "prime" the socket layer by creating and closing a test socket */
-    printf("DC Now: Priming socket layer...\n");
-    int test_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (test_sock >= 0) {
-        printf("DC Now: Test socket created successfully (fd=%d)\n", test_sock);
-        close(test_sock);
-        printf("DC Now: Test socket closed\n");
-    } else {
-        printf("DC Now: Test socket failed with errno=%d, continuing anyway...\n", errno);
+    /* Try to "prime" the socket layer with retry logic */
+    printf("DC Now: Priming socket layer with retries...\n");
+    int test_sock = -1;
+    int retry_count = 0;
+    int max_retries = 5;
+
+    for (retry_count = 0; retry_count < max_retries; retry_count++) {
+        test_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        if (test_sock >= 0) {
+            printf("DC Now: Test socket created successfully on attempt %d (fd=%d)\n", retry_count + 1, test_sock);
+            close(test_sock);
+            printf("DC Now: Test socket closed\n");
+            break;
+        } else {
+            printf("DC Now: Test socket attempt %d failed with errno=%d\n", retry_count + 1, errno);
+            if (retry_count < max_retries - 1) {
+                printf("DC Now: Waiting 2 seconds before retry...\n");
+                thd_sleep(2000);  /* Wait 2 seconds between retries */
+            }
+        }
+    }
+
+    if (test_sock < 0) {
+        printf("DC Now: WARNING - All socket priming attempts failed, but continuing...\n");
     }
 
     printf("DC Now: Ready to create sockets\n");
