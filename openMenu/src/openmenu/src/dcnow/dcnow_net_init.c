@@ -21,11 +21,14 @@ void dcnow_set_status_callback(dcnow_status_callback_t callback) {
 static void update_status(const char* message) {
     printf("DC Now STATUS: %s\n", message);
 
-    /* Also log to SD card for debugging without serial cable */
-    FILE* logfile = fopen("/cd/DCNOW_LOG.TXT", "a");
+    /* Log to RAM disk for debugging without serial cable */
+    /* /ram/ is writable, unlike /cd/ which is read-only */
+    FILE* logfile = fopen("/ram/DCNOW_LOG.TXT", "a");
     if (logfile) {
         fprintf(logfile, "STATUS: %s\n", message);
         fclose(logfile);
+    } else {
+        printf("DC Now: WARNING - Failed to open log file\n");
     }
 
     if (status_callback) {
@@ -38,12 +41,10 @@ static void update_status(const char* message) {
         timer_spin_sleep(500);  /* 500ms delay so messages are visible */
     } else {
         printf("DC Now: WARNING - No status callback set!\n");
+        logfile = fopen("/ram/DCNOW_LOG.TXT", "a");
         if (logfile) {
-            logfile = fopen("/cd/DCNOW_LOG.TXT", "a");
-            if (logfile) {
-                fprintf(logfile, "ERROR: No status callback!\n");
-                fclose(logfile);
-            }
+            fprintf(logfile, "ERROR: No status callback!\n");
+            fclose(logfile);
         }
     }
 }

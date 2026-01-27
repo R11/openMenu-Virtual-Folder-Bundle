@@ -22,6 +22,7 @@
 static dcnow_data_t cached_data = {0};
 static bool cache_valid = false;
 static bool network_initialized = false;
+static int last_socket_errno = 0;  /* Store errno from socket failures */
 
 int dcnow_init(void) {
 #ifdef _arch_dreamcast
@@ -104,7 +105,7 @@ static int http_get_request(const char* hostname, const char* path, char* respon
            net_default_dev->ip_addr[3]);
 
     /* Log to SD card */
-    FILE* logfile = fopen("/cd/DCNOW_LOG.TXT", "a");
+    FILE* logfile = fopen("/ram/DCNOW_LOG.TXT", "a");
     if (logfile) {
         fprintf(logfile, "Creating socket: Device=%s, IP=%d.%d.%d.%d\n",
                 net_default_dev->name,
@@ -119,10 +120,11 @@ static int http_get_request(const char* hostname, const char* path, char* respon
     sock = socket(AF_INET, SOCK_STREAM, 0);
 
     if (sock < 0) {
+        last_socket_errno = errno;  /* Save errno for display */
         printf("DC Now: ERROR - socket() returned %d, errno=%d\n", sock, errno);
 
         /* Log to SD card */
-        logfile = fopen("/cd/DCNOW_LOG.TXT", "a");
+        logfile = fopen("/ram/DCNOW_LOG.TXT", "a");
         if (logfile) {
             fprintf(logfile, "SOCKET ERROR: socket()=%d, errno=%d\n", sock, errno);
             fclose(logfile);
@@ -140,10 +142,12 @@ static int http_get_request(const char* hostname, const char* path, char* respon
         return -2;  /* Socket creation failed */
     }
 
+    last_socket_errno = 0;  /* Clear errno on success */
+
     printf("DC Now: Socket created successfully (fd=%d)\n", sock);
 
     /* Log success to SD card */
-    logfile = fopen("/cd/DCNOW_LOG.TXT", "a");
+    logfile = fopen("/ram/DCNOW_LOG.TXT", "a");
     if (logfile) {
         fprintf(logfile, "Socket created: fd=%d\n", sock);
         fclose(logfile);
@@ -286,15 +290,41 @@ int dcnow_fetch_data(dcnow_data_t *data, uint32_t timeout_ms) {
     if (result < 0) {
         /* Network error - create meaningful error message */
         const char* error_msg = "Unknown error";
+        const char* errno_str = "";
+        char errno_buf[64] = "";
+
         switch(result) {
-            case -2: error_msg = "Socket creation failed"; break;
+            case -2:
+                error_msg = "Socket creation failed";
+                /* Include errno if available */
+                if (last_socket_errno != 0) {
+                    switch(last_socket_errno) {
+                        case EPROTONOSUPPORT: errno_str = "Proto not supported"; break;
+                        case EMFILE: errno_str = "Too many files"; break;
+                        case ENFILE: errno_str = "System table full"; break;
+                        case EACCES: errno_str = "Permission denied"; break;
+                        case ENOBUFS: errno_str = "No buffers"; break;
+                        case ENOMEM: errno_str = "Out of memory"; break;
+                        default:
+                            snprintf(errno_buf, sizeof(errno_buf), "errno=%d", last_socket_errno);
+                            errno_str = errno_buf;
+                            break;
+                    }
+                }
+                break;
             case -3: error_msg = "DNS lookup failed"; break;
             case -4: error_msg = "Connection failed"; break;
             case -5: error_msg = "Send failed"; break;
             case -6: error_msg = "Receive failed"; break;
         }
-        snprintf(data->error_message, sizeof(data->error_message),
-                "%s (err %d)", error_msg, result);
+
+        if (errno_str[0] != '\0') {
+            snprintf(data->error_message, sizeof(data->error_message),
+                    "%s (%s)", error_msg, errno_str);
+        } else {
+            snprintf(data->error_message, sizeof(data->error_message),
+                    "%s (err %d)", error_msg, result);
+        }
         printf("DC Now: Error - %s\n", data->error_message);
         data->data_valid = false;
         return result;
