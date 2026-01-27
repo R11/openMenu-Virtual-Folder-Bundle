@@ -290,7 +290,7 @@ int dcnow_fetch_data(dcnow_data_t *data, uint32_t timeout_ms) {
     char response[8192];
     int result;
 
-    printf("DC Now: Fetching data from dreamcast.online/now...\n");
+    printf("DC Now: Fetching data from dreamcast.online/now/api/users.json...\n");
     printf("DC Now: Using device %s, IP %d.%d.%d.%d\n",
            net_default_dev->name,
            net_default_dev->ip_addr[0],
@@ -298,8 +298,8 @@ int dcnow_fetch_data(dcnow_data_t *data, uint32_t timeout_ms) {
            net_default_dev->ip_addr[2],
            net_default_dev->ip_addr[3]);
 
-    /* Perform HTTP GET request */
-    result = http_get_request("dreamcast.online", "/now", response, sizeof(response), timeout_ms);
+    /* Perform HTTP GET request - use correct API endpoint */
+    result = http_get_request("dreamcast.online", "/now/api/users.json", response, sizeof(response), timeout_ms);
 
     if (result < 0) {
         /* Network error - create meaningful error message */
