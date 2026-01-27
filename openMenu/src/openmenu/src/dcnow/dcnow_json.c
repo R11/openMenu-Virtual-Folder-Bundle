@@ -109,76 +109,79 @@ bool dcnow_json_parse(const char* json_str, json_dcnow_t* result) {
     }
     p++;
 
-    /* Parse total_players */
-    const char* total_val = find_key(p, "total_players");
-    if (total_val) {
-        const char* next = parse_number(total_val, &result->total_players);
+    /* Parse online_count (total players) */
+    const char* online_val = find_key(p, "online_count");
+    if (online_val) {
+        const char* next = parse_number(online_val, &result->total_players);
         if (!next) {
             result->total_players = 0;
         }
     }
 
-    /* Find games array */
-    const char* games_val = find_key(p, "games");
-    if (!games_val || *games_val != '[') {
-        /* No games array, but that's okay - could be empty */
+    /* Find users array */
+    const char* users_val = find_key(p, "users");
+    if (!users_val || *users_val != '[') {
+        /* No users array - return empty but valid */
         result->valid = true;
         return true;
     }
 
-    games_val++;  /* Skip opening bracket */
-    games_val = skip_whitespace(games_val);
+    users_val++;  /* Skip opening bracket */
+    users_val = skip_whitespace(users_val);
 
-    /* Parse each game object */
-    int game_idx = 0;
-    while (*games_val && *games_val != ']' && game_idx < JSON_MAX_GAMES) {
-        games_val = skip_whitespace(games_val);
+    /* Parse each user and aggregate games */
+    while (*users_val && *users_val != ']') {
+        users_val = skip_whitespace(users_val);
 
-        if (*games_val != '{') {
+        if (*users_val != '{') {
             break;  /* Not an object */
         }
-        games_val++;  /* Skip opening brace */
+        users_val++;  /* Skip opening brace */
 
-        /* Parse game object */
-        json_game_t* game = &result->games[game_idx];
+        /* Find current_game_display field */
+        const char* game_val = find_key(users_val, "current_game_display");
+        if (game_val && *game_val == '"') {
+            char game_name[JSON_MAX_NAME_LEN];
+            const char* next = parse_string(game_val, game_name, JSON_MAX_NAME_LEN);
 
-        /* Find "name" field */
-        const char* name_val = find_key(games_val, "name");
-        if (name_val) {
-            const char* next = parse_string(name_val, game->name, JSON_MAX_NAME_LEN);
-            if (!next) {
-                game->name[0] = '\0';
+            if (next && game_name[0] != '\0') {
+                /* Find existing game or add new one */
+                int found_idx = -1;
+                for (int i = 0; i < result->game_count; i++) {
+                    if (strcmp(result->games[i].name, game_name) == 0) {
+                        found_idx = i;
+                        break;
+                    }
+                }
+
+                if (found_idx >= 0) {
+                    /* Increment existing game count */
+                    result->games[found_idx].players++;
+                } else if (result->game_count < JSON_MAX_GAMES) {
+                    /* Add new game */
+                    strncpy(result->games[result->game_count].name, game_name, JSON_MAX_NAME_LEN - 1);
+                    result->games[result->game_count].name[JSON_MAX_NAME_LEN - 1] = '\0';
+                    result->games[result->game_count].players = 1;
+                    result->game_count++;
+                }
             }
         }
 
-        /* Find "players" field */
-        const char* players_val = find_key(games_val, "players");
-        if (players_val) {
-            const char* next = parse_number(players_val, &game->players);
-            if (!next) {
-                game->players = 0;
-            }
-        }
-
-        /* Skip to end of object */
+        /* Skip to end of user object */
         int brace_count = 1;
-        while (*games_val && brace_count > 0) {
-            if (*games_val == '{') brace_count++;
-            else if (*games_val == '}') brace_count--;
-            games_val++;
+        while (*users_val && brace_count > 0) {
+            if (*users_val == '{') brace_count++;
+            else if (*users_val == '}') brace_count--;
+            users_val++;
         }
-
-        game_idx++;
 
         /* Skip comma if present */
-        games_val = skip_whitespace(games_val);
-        if (*games_val == ',') {
-            games_val++;
+        users_val = skip_whitespace(users_val);
+        if (*users_val == ',') {
+            users_val++;
         }
     }
 
-    result->game_count = game_idx;
     result->valid = true;
-
     return true;
 }

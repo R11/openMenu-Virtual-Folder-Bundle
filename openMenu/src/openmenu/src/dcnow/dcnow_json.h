@@ -30,14 +30,17 @@ typedef struct {
 /**
  * Parse DC Now JSON response
  *
- * Expected format:
+ * Expected format (from /now/api/users.json):
  * {
- *   "total_players": 19,
- *   "games": [
- *     {"name": "Game 1", "players": 5},
- *     {"name": "Game 2", "players": 3}
- *   ]
+ *   "users": [
+ *     {"username": "player1", "current_game_display": "Phantasy Star Online", ...},
+ *     {"username": "player2", "current_game_display": "Quake III", ...}
+ *   ],
+ *   "total_count": 7,
+ *   "online_count": 7
  * }
+ *
+ * This parser aggregates users by game and counts players per game.
  *
  * @param json_str Null-terminated JSON string
  * @param result Pointer to result structure to fill
