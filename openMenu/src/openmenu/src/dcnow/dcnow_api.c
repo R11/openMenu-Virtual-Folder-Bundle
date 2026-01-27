@@ -29,24 +29,18 @@ int dcnow_init(void) {
     memset(&cached_data, 0, sizeof(cached_data));
     cache_valid = false;
 
-    if (network_initialized) {
-        return 0;  /* Already initialized */
-    }
-
-    /* Network should be initialized early in main() via dcnow_net_early_init() */
-    /* Just check if network device is available */
+    /* Verify network device exists */
     if (!net_default_dev) {
-        printf("DC Now: No network device found\n");
-        printf("DC Now: Make sure BBA is connected or DreamPi modem is dialed\n");
+        printf("DC Now: ERROR - No network device (net_default_dev is NULL)\n");
         return -1;
     }
 
-    printf("DC Now: Network device: %s\n", net_default_dev->name);
+    printf("DC Now: Found network device: %s\n", net_default_dev->name);
 
-    /* Check if we have an IP address */
+    /* Verify we have an IP address */
     if (net_default_dev->ip_addr[0] == 0 && net_default_dev->ip_addr[1] == 0 &&
         net_default_dev->ip_addr[2] == 0 && net_default_dev->ip_addr[3] == 0) {
-        printf("DC Now: No IP address assigned yet\n");
+        printf("DC Now: ERROR - No IP address assigned\n");
         return -2;
     }
 
@@ -56,20 +50,20 @@ int dcnow_init(void) {
            net_default_dev->ip_addr[2],
            net_default_dev->ip_addr[3]);
 
-    /* For modem/DreamPi */
+    /* Identify connection type */
     if (strncmp(net_default_dev->name, "ppp", 3) == 0) {
-        printf("DC Now: Modem/DreamPi detected\n");
-    }
-    /* For BBA */
-    else if (strncmp(net_default_dev->name, "bba", 3) == 0) {
-        printf("DC Now: Broadband Adapter detected\n");
+        printf("DC Now: Using PPP (DreamPi/Modem)\n");
+    } else if (strncmp(net_default_dev->name, "bba", 3) == 0) {
+        printf("DC Now: Using BBA (Broadband Adapter)\n");
+    } else {
+        printf("DC Now: Using %s\n", net_default_dev->name);
     }
 
-    /* Give the network stack a moment to fully initialize */
-    printf("DC Now: Waiting for network stack...\n");
-    thd_sleep(1000);  /* 1 second delay */
+    /* CRITICAL: Wait for BSD socket layer to initialize after PPP link */
+    printf("DC Now: Waiting for socket layer initialization...\n");
+    thd_sleep(2000);  /* 2 seconds - give BSD stack time to fully initialize */
 
-    printf("DC Now: Network ready\n");
+    printf("DC Now: Ready to create sockets\n");
     network_initialized = true;
     return 0;
 #else
@@ -221,31 +215,47 @@ int dcnow_fetch_data(dcnow_data_t *data, uint32_t timeout_ms) {
     memset(data, 0, sizeof(dcnow_data_t));
 
 #ifdef _arch_dreamcast
-    /* Check if network is initialized */
-    if (!network_initialized) {
-        strcpy(data->error_message, "Network not initialized");
+    /* Detailed network checks */
+    if (!net_default_dev) {
+        snprintf(data->error_message, sizeof(data->error_message),
+                "No network device found");
         data->data_valid = false;
         return -11;
+    }
+
+    if (net_default_dev->ip_addr[0] == 0) {
+        snprintf(data->error_message, sizeof(data->error_message),
+                "No IP address assigned");
+        data->data_valid = false;
+        return -12;
     }
 
     char response[8192];
     int result;
 
     printf("DC Now: Fetching data from dreamcast.online/now...\n");
+    printf("DC Now: Using device %s, IP %d.%d.%d.%d\n",
+           net_default_dev->name,
+           net_default_dev->ip_addr[0],
+           net_default_dev->ip_addr[1],
+           net_default_dev->ip_addr[2],
+           net_default_dev->ip_addr[3]);
 
     /* Perform HTTP GET request */
     result = http_get_request("dreamcast.online", "/now", response, sizeof(response), timeout_ms);
 
     if (result < 0) {
-        /* Network error */
-        switch (result) {
-            case -2: strcpy(data->error_message, "Socket creation failed"); break;
-            case -3: strcpy(data->error_message, "DNS lookup failed"); break;
-            case -4: strcpy(data->error_message, "Connection failed"); break;
-            case -5: strcpy(data->error_message, "Failed to send request"); break;
-            case -6: strcpy(data->error_message, "Failed to receive data"); break;
-            default: strcpy(data->error_message, "Network error"); break;
+        /* Network error - create meaningful error message */
+        const char* error_msg = "Unknown error";
+        switch(result) {
+            case -2: error_msg = "Socket creation failed"; break;
+            case -3: error_msg = "DNS lookup failed"; break;
+            case -4: error_msg = "Connection failed"; break;
+            case -5: error_msg = "Send failed"; break;
+            case -6: error_msg = "Receive failed"; break;
         }
+        snprintf(data->error_message, sizeof(data->error_message),
+                "%s (err %d)", error_msg, result);
         printf("DC Now: Error - %s\n", data->error_message);
         data->data_valid = false;
         return result;
