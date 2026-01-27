@@ -7,6 +7,7 @@
 #include <kos/net.h>
 #include <ppp/ppp.h>
 #include <dc/modem/modem.h>
+#include <dc/flashrom.h>
 #include <arch/timer.h>
 #include <dc/pvr.h>
 #endif
@@ -59,35 +60,55 @@ int dcnow_net_early_init(void) {
         return 0;  /* BBA already active, we're done */
     }
 
-    /* No BBA detected - try modem initialization (DreamPi dial-up) */
+    /* No BBA detected - try modem initialization using stored ISP config */
+    update_status("Reading ISP config...");
+
+    /* Read stored ISP configuration from flashrom (like browser does!) */
+    flashrom_ispcfg_t isp_config;
+    int config_result = flashrom_get_pw_ispcfg(&isp_config);  /* Try PlanetWeb first */
+    if (config_result < 0) {
+        config_result = flashrom_get_ispcfg(&isp_config);  /* Fall back to DreamPassport */
+    }
+
+    if (config_result < 0) {
+        update_status("No ISP config found!");
+        printf("DC Now: ERROR - No stored ISP configuration found in flashrom\n");
+        printf("DC Now: Please configure ISP settings using Dreamcast browser first\n");
+        return -1;
+    }
+
+    printf("DC Now: ISP config loaded from flashrom\n");
+    printf("DC Now: Phone: %s\n", isp_config.phone1);
+    printf("DC Now: PPP Login: %s\n", isp_config.ppp_login);
+
     update_status("Initializing modem...");
 
-    /* Initialize modem hardware FIRST (like ClassiCube does) */
+    /* Initialize modem hardware */
     if (!modem_init()) {
         update_status("Modem init failed!");
-        return -1;
+        return -2;
     }
 
     /* Initialize PPP subsystem */
     if (ppp_init() < 0) {
         update_status("PPP init failed!");
-        return -2;
-    }
-
-    /* Dial modem (using DreamPi dummy number - EXACTLY like ClassiCube) */
-    update_status("Dialing DreamPi...");
-    int err = ppp_modem_init("111111111111", 1, NULL);
-    if (err) {
-        update_status("Dial failed!");
-        ppp_shutdown();
         return -3;
     }
 
-    /* Set login credentials (ClassiCube uses "dream"/"dreamcast") */
-    if (ppp_set_login("dream", "dreamcast") < 0) {
-        update_status("Login setup failed!");
+    /* Dial using stored phone number */
+    update_status("Dialing...");
+    int err = ppp_modem_init(isp_config.phone1, 1, NULL);
+    if (err) {
+        update_status("Dial failed!");
         ppp_shutdown();
         return -4;
+    }
+
+    /* Use stored PPP credentials */
+    if (ppp_set_login(isp_config.ppp_login, isp_config.ppp_passwd) < 0) {
+        update_status("Login setup failed!");
+        ppp_shutdown();
+        return -5;
     }
 
     /* Establish PPP connection */
@@ -96,7 +117,7 @@ int dcnow_net_early_init(void) {
     if (err) {
         update_status("Connection failed!");
         ppp_shutdown();
-        return -5;
+        return -6;
     }
 
     /* ppp_connect() is BLOCKING - returns when connection is established */
