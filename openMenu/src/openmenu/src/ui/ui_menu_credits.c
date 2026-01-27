@@ -1781,28 +1781,37 @@ static bool dcnow_is_loading = false;
 static bool dcnow_net_initialized = false;
 static char connection_status[128] = "";
 
-/* Visual callback for network connection status - called FROM update_status() in dcnow_net_init.c */
-/* NOTE: This is called INSIDE a pvr_scene_begin/finish from update_status(), so DON'T call them again */
+/* Visual callback for network connection status - renders full scene */
 static void dcnow_connection_status_callback(const char* message) {
-    /* Draw transparent background overlay */
+    pvr_wait_ready();
+    pvr_scene_begin();
+
+    /* Opaque pass - nothing to draw */
+    draw_set_list(PVR_LIST_OP_POLY);
+    pvr_list_begin(PVR_LIST_OP_POLY);
+    pvr_list_finish();
+
+    /* Transparent pass - draw status box */
     draw_set_list(PVR_LIST_TR_POLY);
     pvr_list_begin(PVR_LIST_TR_POLY);
 
-    /* Semi-transparent black background */
+    /* White border (larger box) */
     const int border_width = 2;
     draw_draw_quad(160 - border_width, 200 - border_width,
                    320 + (2 * border_width), 80 + (2 * border_width),
-                   0xFFFFFFFF);  /* White border */
+                   0xFFFFFFFF);
 
-    draw_draw_quad(160, 200, 320, 80, 0xFF000000);  /* Black background */
+    /* Black background (smaller box on top) */
+    draw_draw_quad(160, 200, 320, 80, 0xFF000000);
 
     /* Draw text */
     font_bmf_begin_draw();
     font_bmf_set_height_default();
     font_bmf_draw_centered(320, 215, 0xFFFFFFFF, "DC Now - Connecting");
-    font_bmf_draw_centered(320, 240, 0xFFFFFF00, message);  /* Yellow status */
+    font_bmf_draw_centered(320, 240, 0xFFFFFF00, message);
 
     pvr_list_finish();
+    pvr_scene_finish();
 }
 
 void

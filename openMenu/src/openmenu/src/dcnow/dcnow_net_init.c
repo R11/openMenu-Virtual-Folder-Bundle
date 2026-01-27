@@ -19,14 +19,17 @@ void dcnow_set_status_callback(dcnow_status_callback_t callback) {
 }
 
 static void update_status(const char* message) {
-    printf("%s\n", message);
+    printf("DC Now STATUS: %s\n", message);
     if (status_callback) {
+        printf("DC Now: Calling status callback...\n");
+        /* Call callback which will draw the message */
+        /* Callback is responsible for full scene rendering */
         status_callback(message);
-        /* Give PVR time to render the update */
-        pvr_wait_ready();
-        pvr_scene_begin();
-        status_callback(message);  /* Callback draws the message */
-        pvr_scene_finish();
+        printf("DC Now: Status callback returned\n");
+        /* Give user time to see the message */
+        timer_spin_sleep(500);  /* 500ms delay so messages are visible */
+    } else {
+        printf("DC Now: WARNING - No status callback set!\n");
     }
 }
 
