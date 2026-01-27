@@ -25,7 +25,7 @@ void dcnow_set_status_callback(dcnow_status_callback_t callback);
  * - For DreamPi/modem: Automatically dials and establishes PPP connection using:
  *   1. modem_init() - Initialize modem hardware (FIRST!)
  *   2. ppp_init() - Initialize PPP subsystem
- *   3. ppp_modem_init("555", 1, NULL) - Dial DreamPi (~20 seconds)
+ *   3. ppp_modem_init("111-1111", 1, NULL) - Dial DreamPi (~20 seconds)
  *   4. ppp_set_login("dream", "dreamcast") - Set auth credentials
  *   5. ppp_connect() - Establish connection (~20 seconds)
  *   6. Waits up to 40 seconds for link up

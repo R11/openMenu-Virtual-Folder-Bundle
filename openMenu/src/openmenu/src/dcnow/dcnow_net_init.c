@@ -55,9 +55,9 @@ int dcnow_net_early_init(void) {
         return -2;
     }
 
-    /* Dial modem (using DreamPi dummy number like ClassiCube) */
+    /* Dial modem (using DreamPi dummy number) */
     update_status("Dialing DreamPi...");
-    int err = ppp_modem_init("555", 1, NULL);
+    int err = ppp_modem_init("111-1111", 1, NULL);
     if (err) {
         update_status("Dial failed!");
         ppp_shutdown();
