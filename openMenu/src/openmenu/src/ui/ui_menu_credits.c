@@ -1814,6 +1814,9 @@ dcnow_setup(enum draw_state* state, struct theme_color* _colors, int* timeout_pt
     popup_setup(state, _colors, timeout_ptr, title_color);
     dcnow_choice = 0;
 
+    /* Set the draw state to DRAW_DCNOW_PLAYERS to actually show the DC Now menu */
+    *state = DRAW_DCNOW_PLAYERS;
+
     /* Network initialization is now done via menu option, not automatically */
     /* User can select "Connect to DreamPi" from the DC Now menu */
 
