@@ -240,6 +240,7 @@ static const int num_credits = sizeof(credits) / sizeof(credit_pair);
 #pragma endregion Credits_Menu
 
 static enum draw_state* state_ptr = NULL;
+static theme_color* stored_colors = NULL;
 static uint32_t text_color;
 static uint32_t highlight_color;
 static uint32_t menu_bkg_color;
@@ -271,6 +272,7 @@ common_setup(enum draw_state* state, theme_color* _colors, int* timeout_ptr) {
 
     /* So we can modify the shared state and input timeout */
     state_ptr = state;
+    stored_colors = _colors;
     input_timeout_ptr = timeout_ptr;
     *input_timeout_ptr = (30 * 1) /* half a second */;
 }
@@ -459,8 +461,8 @@ menu_accept(void) {
         reload_ui();
     }
     if (current_choice == CHOICE_DCNOW) {
-        *state_ptr = DRAW_DCNOW_PLAYERS;
-        *input_timeout_ptr = (20 * 1) /* 1/3 second */;
+        /* Call dcnow_setup() to initialize the DC Now popup */
+        dcnow_setup(state_ptr, stored_colors, input_timeout_ptr, menu_title_color);
     }
     if (current_choice == CHOICE_CREDITS) {
         *state_ptr = DRAW_CREDITS;
