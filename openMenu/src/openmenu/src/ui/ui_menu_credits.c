@@ -1768,12 +1768,10 @@ static void dcnow_connection_status_callback(const char* message) {
     draw_draw_quad(160, 200, 320, 80, 0xFF000000);
 
     /* Title */
-    font_bmp_set_color(0xFFFFFFFF);
-    font_bmp_draw_centered(320, 215, "DC Now - Connecting");
+    font_bmf_draw_centered(320, 215, 0xFFFFFFFF, "DC Now - Connecting");
 
     /* Status message */
-    font_bmp_set_color(0xFFFFFF00);  /* Yellow */
-    font_bmp_draw_centered(320, 245, message);
+    font_bmf_draw_centered(320, 245, 0xFFFFFF00, message);  /* Yellow */
 
     pvr_scene_finish();
 }
