@@ -530,6 +530,10 @@ menu_choice_prev(void) {
         if (current_choice == CHOICE_BEEP) {
             skip = 1;
         }
+        /* Skip DCNOW in up/down navigation (reached via left/right from Save/Apply) */
+        if (current_choice == CHOICE_DCNOW) {
+            skip = 1;
+        }
         /* Skip CREDITS in up/down navigation (reached via left/right from Save/Apply) */
         if (current_choice == CHOICE_CREDITS) {
             skip = 1;
@@ -608,6 +612,10 @@ menu_choice_next(void) {
         if (current_choice == CHOICE_BEEP) {
             skip = 1;
         }
+        /* Skip DCNOW in up/down navigation (reached via left/right from Save/Apply) */
+        if (current_choice == CHOICE_DCNOW) {
+            skip = 1;
+        }
         /* Skip CREDITS in up/down navigation (reached via left/right from Save/Apply) */
         if (current_choice == CHOICE_CREDITS) {
             skip = 1;
@@ -672,8 +680,15 @@ menu_choice_left(void) {
     if (*input_timeout_ptr > 0) {
         return;
     }
-    /* Handle Save/Apply/Credits row navigation */
+    /* Handle Save/Apply/DC Now/Credits row navigation */
     if (current_choice == CHOICE_CREDITS) {
+        /* Move left from Credits to DC Now */
+        current_choice = CHOICE_DCNOW;
+        *input_timeout_ptr = INPUT_TIMEOUT;
+        return;
+    }
+    if (current_choice == CHOICE_DCNOW) {
+        /* Move left from DC Now to Apply */
         current_choice = CHOICE_SAVE;
         choices[CHOICE_SAVE] = 1;  /* Select Apply */
         *input_timeout_ptr = INPUT_TIMEOUT;
@@ -698,14 +713,20 @@ menu_choice_right(void) {
     if (*input_timeout_ptr > 0) {
         return;
     }
-    /* Handle Save/Apply/Credits row navigation */
+    /* Handle Save/Apply/DC Now/Credits row navigation */
     if (current_choice == CHOICE_CREDITS) {
         /* Already on Credits (rightmost), do nothing */
         return;
     }
-    if (current_choice == CHOICE_SAVE && choices[CHOICE_SAVE] == 1) {
-        /* On Apply, move right to Credits */
+    if (current_choice == CHOICE_DCNOW) {
+        /* Move right from DC Now to Credits */
         current_choice = CHOICE_CREDITS;
+        *input_timeout_ptr = INPUT_TIMEOUT;
+        return;
+    }
+    if (current_choice == CHOICE_SAVE && choices[CHOICE_SAVE] == 1) {
+        /* On Apply, move right to DC Now */
+        current_choice = CHOICE_DCNOW;
         *input_timeout_ptr = INPUT_TIMEOUT;
         return;
     }
