@@ -1758,13 +1758,14 @@ static void dcnow_connection_status_callback(const char* message) {
     pvr_wait_ready();
     pvr_scene_begin();
 
-    /* Black background */
-    draw_set_color(0xFF000000);
-    draw_draw_box(160, 200, 320, 80);
+    /* White border (draw larger box first) */
+    const int border_width = 2;
+    draw_draw_quad(160 - border_width, 200 - border_width,
+                   320 + (2 * border_width), 80 + (2 * border_width),
+                   0xFFFFFFFF);
 
-    /* White border */
-    draw_set_color(0xFFFFFFFF);
-    draw_draw_box_outline(160, 200, 320, 80);
+    /* Black background (draw smaller box on top) */
+    draw_draw_quad(160, 200, 320, 80, 0xFF000000);
 
     /* Title */
     font_bmp_set_color(0xFFFFFFFF);
