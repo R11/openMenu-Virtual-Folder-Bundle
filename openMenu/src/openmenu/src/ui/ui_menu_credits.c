@@ -459,7 +459,7 @@ menu_accept(void) {
         reload_ui();
     }
     if (current_choice == CHOICE_DCNOW) {
-        *state_ptr = DRAW_DCNOW;
+        *state_ptr = DRAW_DCNOW_PLAYERS;
         *input_timeout_ptr = (20 * 1) /* 1/3 second */;
     }
     if (current_choice == CHOICE_CREDITS) {
@@ -1822,7 +1822,6 @@ dcnow_setup(enum draw_state* state, struct theme_color* _colors, int* timeout_pt
     }
 }
 
-void
 /* Helper to render a connection status frame before blocking operation */
 static void render_connection_frame(const char* message) {
     pvr_wait_ready();
@@ -1852,6 +1851,7 @@ static void render_connection_frame(const char* message) {
     pvr_scene_finish();
 }
 
+void
 handle_input_dcnow(enum control input) {
     switch (input) {
         case A: {
