@@ -1915,42 +1915,13 @@ handle_input_dcnow(enum control input) {
                     dcnow_net_initialized = true;  /* Mark as attempted */
                 } else {
                     printf("DC Now: Connection successful\n");
-
-                    /* Wait 30 seconds - ClassiCube users wait longer before creating sockets */
-                    for (int i = 30; i > 0; i--) {
-                        char msg[64];
-                        snprintf(msg, sizeof(msg), "Waiting %d seconds...", i);
-                        dcnow_connection_status_callback(msg);
-                        thd_sleep(1000);
-                    }
-
-                    /* Initialize DC Now API layer */
-                    dcnow_connection_status_callback("Initializing...");
-                    int api_result = dcnow_init();
-
-                    if (api_result < 0) {
-                        printf("DC Now: API init failed: %d\n", api_result);
-                        memset(&dcnow_data, 0, sizeof(dcnow_data));
-                        snprintf(dcnow_data.error_message, sizeof(dcnow_data.error_message),
-                                "Init failed (error %d)", api_result);
-                        dcnow_data.data_valid = false;
-                    } else {
-                        printf("DC Now: API ready, fetching data...\n");
-
-                        /* Now fetch data */
-                        dcnow_is_loading = true;
-                        int result = dcnow_fetch_data(&dcnow_data, 5000);
-                        if (result == 0) {
-                            dcnow_data_fetched = true;
-                            printf("DC Now: Data fetched successfully\n");
-                        } else {
-                            printf("DC Now: Data fetch failed: %d\n", result);
-                            /* error_message already set by dcnow_fetch_data */
-                        }
-                        dcnow_is_loading = false;
-                    }
-
+                    /* Don't fetch data immediately - let user press A again */
+                    /* This gives socket layer time to be ready */
                     dcnow_net_initialized = true;
+                    memset(&dcnow_data, 0, sizeof(dcnow_data));
+                    snprintf(dcnow_data.error_message, sizeof(dcnow_data.error_message),
+                            "Connected! Press A to fetch data");
+                    dcnow_data.data_valid = false;
                 }
             } else {
                 /* Already connected - refresh data */

@@ -74,9 +74,9 @@ int dcnow_net_early_init(void) {
         return -2;
     }
 
-    /* Dial modem (using DreamPi dummy number) */
+    /* Dial modem (using DreamPi dummy number - EXACTLY like ClassiCube) */
     update_status("Dialing DreamPi...");
-    int err = ppp_modem_init("111-1111", 1, NULL);
+    int err = ppp_modem_init("111111111111", 1, NULL);
     if (err) {
         update_status("Dial failed!");
         ppp_shutdown();
@@ -102,33 +102,6 @@ int dcnow_net_early_init(void) {
     /* ppp_connect() is BLOCKING - returns when connection is established */
     update_status("Connected!");
     printf("DC Now: ppp_connect() succeeded\n");
-
-    /* Verify we have IP and DNS configuration */
-    if (net_default_dev) {
-        printf("DC Now: IP: %d.%d.%d.%d\n",
-               net_default_dev->ip_addr[0],
-               net_default_dev->ip_addr[1],
-               net_default_dev->ip_addr[2],
-               net_default_dev->ip_addr[3]);
-        printf("DC Now: Gateway: %d.%d.%d.%d\n",
-               net_default_dev->gateway[0],
-               net_default_dev->gateway[1],
-               net_default_dev->gateway[2],
-               net_default_dev->gateway[3]);
-        printf("DC Now: DNS: %d.%d.%d.%d\n",
-               net_default_dev->dns[0],
-               net_default_dev->dns[1],
-               net_default_dev->dns[2],
-               net_default_dev->dns[3]);
-    }
-
-    /* Give PPP background thread time to process packets */
-    update_status("Stabilizing connection...");
-    printf("DC Now: Yielding to PPP thread...\n");
-    for (int i = 0; i < 100; i++) {
-        thd_pass();  /* Yield to other threads */
-    }
-    timer_spin_sleep(2000);  /* Wait 2 seconds for good measure */
 
     return 0;
 
