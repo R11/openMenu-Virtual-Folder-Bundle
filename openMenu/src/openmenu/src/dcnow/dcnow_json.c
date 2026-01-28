@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <stdio.h>
+#include <stdbool.h>
 
 /* Helper functions */
 
@@ -146,12 +147,16 @@ bool dcnow_json_parse(const char* json_str, json_dcnow_t* result) {
 
         /* Find current_game_display field */
         const char* game_val = find_key(users_val, "current_game_display");
+        bool has_game = false;
+
         if (game_val && *game_val == '"') {
             char game_name[JSON_MAX_NAME_LEN];
             const char* next = parse_string(game_val, game_name, JSON_MAX_NAME_LEN);
 
             if (next && game_name[0] != '\0') {
+                /* User has a game */
                 users_with_games++;
+                has_game = true;
 
                 /* Find existing game or add new one */
                 int found_idx = -1;
@@ -172,17 +177,13 @@ bool dcnow_json_parse(const char* json_str, json_dcnow_t* result) {
                     result->games[result->game_count].players = 1;
                     result->game_count++;
                 }
-            } else {
-                users_without_games++;
-                printf("DC Now: User %d has empty current_game_display\n", user_count);
             }
-        } else if (game_val && *game_val == 'n') {
-            /* Likely null value */
+        }
+
+        if (!has_game) {
+            /* User is idle/not in a game - count them separately */
             users_without_games++;
-            printf("DC Now: User %d has null current_game_display\n", user_count);
-        } else {
-            users_without_games++;
-            printf("DC Now: User %d missing current_game_display field\n", user_count);
+            printf("DC Now: User %d is idle/not in game\n", user_count);
         }
 
         /* Skip to end of user object */
@@ -203,6 +204,14 @@ bool dcnow_json_parse(const char* json_str, json_dcnow_t* result) {
     printf("DC Now: Parsed %d users total - %d with games, %d without games\n",
            user_count, users_with_games, users_without_games);
     printf("DC Now: Total players from API: %d\n", result->total_players);
+
+    /* Add idle users as a separate entry if any */
+    if (users_without_games > 0 && result->game_count < JSON_MAX_GAMES) {
+        strncpy(result->games[result->game_count].name, "Idle/Not in game", JSON_MAX_NAME_LEN - 1);
+        result->games[result->game_count].name[JSON_MAX_NAME_LEN - 1] = '\0';
+        result->games[result->game_count].players = users_without_games;
+        result->game_count++;
+    }
 
     result->valid = true;
     return true;
