@@ -2176,15 +2176,47 @@ draw_dcnow_tr(void) {
             font_bmp_draw_main(x_item, cur_y, "Refreshing... Please Wait");
             cur_y += line_height;
         } else if (dcnow_data.data_valid) {
-            /* Show total players */
-            char total_buf[64];
-            snprintf(total_buf, sizeof(total_buf), "Total Active Players: %d", dcnow_data.total_players);
-            font_bmp_set_color(text_color);
-            font_bmp_draw_main(x_item, cur_y, total_buf);
-            cur_y += line_height;
+            if (dcnow_view == DCNOW_VIEW_PLAYERS && dcnow_selected_game >= 0) {
+                /* Show player list for selected game */
+                char title_buf[96];
+                snprintf(title_buf, sizeof(title_buf), "%s - %d players",
+                         dcnow_data.games[dcnow_selected_game].game_name,
+                         dcnow_data.games[dcnow_selected_game].player_count);
+                font_bmp_set_color(text_color);
+                font_bmp_draw_main(x_item, cur_y, title_buf);
+                cur_y += line_height;
 
-            /* Show game list */
-            if (dcnow_data.game_count == 0) {
+                int player_count = dcnow_data.games[dcnow_selected_game].player_count;
+                int visible_count = (player_count < max_visible_games) ? player_count : max_visible_games;
+
+                for (int i = 0; i < visible_count; i++) {
+                    int player_idx = dcnow_scroll_offset + i;
+                    if (player_idx >= player_count) break;
+
+                    font_bmp_set_color(player_idx == dcnow_choice ? highlight_color : text_color);
+                    font_bmp_draw_main(x_item, cur_y, dcnow_data.games[dcnow_selected_game].player_names[player_idx]);
+                    cur_y += line_height;
+                }
+
+                /* Show scroll indicators if needed */
+                if (player_count > max_visible_games) {
+                    char scroll_info[32];
+                    snprintf(scroll_info, sizeof(scroll_info), "(%d/%d)",
+                             dcnow_choice + 1, player_count);
+                    font_bmp_set_color(text_color);
+                    font_bmp_draw_main(x_item, cur_y, scroll_info);
+                    cur_y += line_height;
+                }
+            } else {
+                /* Show total players */
+                char total_buf[64];
+                snprintf(total_buf, sizeof(total_buf), "Total Active Players: %d", dcnow_data.total_players);
+                font_bmp_set_color(text_color);
+                font_bmp_draw_main(x_item, cur_y, total_buf);
+                cur_y += line_height;
+
+                /* Show game list */
+                if (dcnow_data.game_count == 0) {
                 font_bmp_set_color(text_color);
                 font_bmp_draw_main(x_item, cur_y, "No active games");
                 cur_y += line_height;
@@ -2256,6 +2288,7 @@ draw_dcnow_tr(void) {
                     font_bmp_draw_main(x_item, cur_y, scroll_info);
                     cur_y += line_height;
                 }
+                }
             }
         } else {
             /* Show error message or connection prompt */
@@ -2273,7 +2306,15 @@ draw_dcnow_tr(void) {
         /* Instructions */
         cur_y += line_height / 2;  /* Add a small gap before instructions */
         font_bmp_set_color(text_color);
-        font_bmp_draw_main(x_item, cur_y, "Push A to Refresh  |  Push B to Close");
+        if (dcnow_view == DCNOW_VIEW_PLAYERS) {
+            font_bmp_draw_main(x_item, cur_y, "Push B to go Back  |  Push X to Refresh");
+        } else if (!dcnow_net_initialized) {
+            font_bmp_draw_main(x_item, cur_y, "Push A to Connect  |  Push B to Close");
+        } else if (!dcnow_data.data_valid) {
+            font_bmp_draw_main(x_item, cur_y, "Push A to Fetch  |  Push B to Close");
+        } else {
+            font_bmp_draw_main(x_item, cur_y, "A=Details  X=Refresh  B=Close");
+        }
         cur_y += line_height;
 
     } else {
@@ -2332,14 +2373,44 @@ draw_dcnow_tr(void) {
             cur_y += line_height;
             font_bmf_draw(x_item, cur_y, text_color, "Refreshing... Please Wait");
         } else if (dcnow_data.data_valid) {
-            /* Total players */
-            cur_y += line_height;
-            char total_buf[64];
-            snprintf(total_buf, sizeof(total_buf), "Total Active Players: %d", dcnow_data.total_players);
-            font_bmf_draw(x_item, cur_y, text_color, total_buf);
+            if (dcnow_view == DCNOW_VIEW_PLAYERS && dcnow_selected_game >= 0) {
+                /* Show player list for selected game */
+                cur_y += line_height;
+                char title_buf[96];
+                snprintf(title_buf, sizeof(title_buf), "%s - %d players",
+                         dcnow_data.games[dcnow_selected_game].game_name,
+                         dcnow_data.games[dcnow_selected_game].player_count);
+                font_bmf_draw(x_item, cur_y, text_color, title_buf);
 
-            /* Game list */
-            if (dcnow_data.game_count == 0) {
+                int player_count = dcnow_data.games[dcnow_selected_game].player_count;
+                int visible_count = (player_count < max_visible_games) ? player_count : max_visible_games;
+
+                for (int i = 0; i < visible_count; i++) {
+                    int player_idx = dcnow_scroll_offset + i;
+                    if (player_idx >= player_count) break;
+
+                    cur_y += line_height;
+                    uint32_t color = (player_idx == dcnow_choice) ? highlight_color : text_color;
+                    font_bmf_draw(x_item, cur_y, color, dcnow_data.games[dcnow_selected_game].player_names[player_idx]);
+                }
+
+                /* Show scroll indicators if needed */
+                if (player_count > max_visible_games) {
+                    cur_y += line_height;
+                    char scroll_info[32];
+                    snprintf(scroll_info, sizeof(scroll_info), "(%d/%d)",
+                             dcnow_choice + 1, player_count);
+                    font_bmf_draw(x_item, cur_y, text_color, scroll_info);
+                }
+            } else {
+                /* Total players */
+                cur_y += line_height;
+                char total_buf[64];
+                snprintf(total_buf, sizeof(total_buf), "Total Active Players: %d", dcnow_data.total_players);
+                font_bmf_draw(x_item, cur_y, text_color, total_buf);
+
+                /* Game list */
+                if (dcnow_data.game_count == 0) {
                 cur_y += line_height;
                 font_bmf_draw(x_item, cur_y, text_color, "No active games");
             } else {
@@ -2403,6 +2474,7 @@ draw_dcnow_tr(void) {
                              dcnow_choice + 1, dcnow_data.game_count);
                     font_bmf_draw(x_item, cur_y, text_color, scroll_info);
                 }
+                }
             }
         } else {
             /* Error or connection prompt */
@@ -2419,7 +2491,15 @@ draw_dcnow_tr(void) {
 
         /* Instructions */
         cur_y += line_height / 2;  /* Add a small gap before instructions */
-        font_bmf_draw(x_item, cur_y, text_color, "Push A to Refresh  |  Push B to Close");
+        if (dcnow_view == DCNOW_VIEW_PLAYERS) {
+            font_bmf_draw(x_item, cur_y, text_color, "Push B to go Back  |  Push X to Refresh");
+        } else if (!dcnow_net_initialized) {
+            font_bmf_draw(x_item, cur_y, text_color, "Push A to Connect  |  Push B to Close");
+        } else if (!dcnow_data.data_valid) {
+            font_bmf_draw(x_item, cur_y, text_color, "Push A to Fetch  |  Push B to Close");
+        } else {
+            font_bmf_draw(x_item, cur_y, text_color, "A=Details  X=Refresh  B=Close");
+        }
         cur_y += line_height;
     }
 }
