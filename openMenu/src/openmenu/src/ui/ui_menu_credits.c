@@ -1866,6 +1866,7 @@ static int dcnow_selected_game = -1; /* Index of selected game for player view *
 static bool dcnow_data_fetched = false;
 static bool dcnow_is_loading = false;
 static bool dcnow_needs_fetch = false;  /* Flag to trigger fetch on next frame */
+static bool dcnow_shown_loading = false;  /* Track if we've displayed loading screen */
 static bool dcnow_net_initialized = false;
 static char connection_status[128] = "";
 
@@ -2022,7 +2023,11 @@ handle_input_dcnow(enum control input) {
                 dcnow_view = DCNOW_VIEW_PLAYERS;
                 dcnow_choice = 0;
                 dcnow_scroll_offset = 0;
-                printf("DC Now: Viewing players for game %d\n", dcnow_selected_game);
+                printf("DC Now: Drilling down - game_idx=%d, view now=%d (1=PLAYERS)\n",
+                       dcnow_selected_game, dcnow_view);
+            } else {
+                printf("DC Now: A pressed but conditions not met - view=%d, choice=%d, game_count=%d, data_valid=%d\n",
+                       dcnow_view, dcnow_choice, dcnow_data.game_count, dcnow_data.data_valid);
             }
         } break;
         case X: {
@@ -2033,6 +2038,7 @@ handle_input_dcnow(enum control input) {
                 dcnow_data.data_valid = false;
                 dcnow_is_loading = true;
                 dcnow_needs_fetch = true;
+                dcnow_shown_loading = false;  /* Reset flag so loading screen shows */
                 dcnow_view = DCNOW_VIEW_GAMES;
                 dcnow_choice = 0;
                 dcnow_scroll_offset = 0;
@@ -2040,14 +2046,17 @@ handle_input_dcnow(enum control input) {
         } break;
         case B: {
             /* B button: Back or Close */
+            printf("DC Now: B pressed, view=%d (0=GAMES, 1=PLAYERS)\n", dcnow_view);
             if (dcnow_view == DCNOW_VIEW_PLAYERS) {
                 /* Go back to game list */
+                printf("DC Now: Going back to game list\n");
                 dcnow_view = DCNOW_VIEW_GAMES;
                 dcnow_choice = dcnow_selected_game;
                 dcnow_scroll_offset = 0;
                 dcnow_selected_game = -1;
             } else {
                 /* Close DC Now menu */
+                printf("DC Now: Closing DC Now menu\n");
                 *state_ptr = DRAW_UI;
             }
         } break;
@@ -2094,8 +2103,8 @@ void
 draw_dcnow_tr(void) {
     z_set_cond(205.0f);
 
-    /* Check if we need to fetch data (deferred from input handler) */
-    if (dcnow_needs_fetch) {
+    /* Check if we need to fetch data (only after showing loading screen) */
+    if (dcnow_needs_fetch && dcnow_shown_loading) {
         dcnow_needs_fetch = false;
         printf("DC Now: Fetching data...\n");
 
@@ -2174,6 +2183,7 @@ draw_dcnow_tr(void) {
             /* Show loading message */
             font_bmp_set_color(text_color);
             font_bmp_draw_main(x_item, cur_y, "Refreshing... Please Wait");
+            dcnow_shown_loading = true;  /* Mark that we've shown the loading screen */
             cur_y += line_height;
         } else if (dcnow_data.data_valid) {
             if (dcnow_view == DCNOW_VIEW_PLAYERS && dcnow_selected_game >= 0) {
@@ -2372,6 +2382,7 @@ draw_dcnow_tr(void) {
         if (dcnow_is_loading) {
             cur_y += line_height;
             font_bmf_draw(x_item, cur_y, text_color, "Refreshing... Please Wait");
+            dcnow_shown_loading = true;  /* Mark that we've shown the loading screen */
         } else if (dcnow_data.data_valid) {
             if (dcnow_view == DCNOW_VIEW_PLAYERS && dcnow_selected_game >= 0) {
                 /* Show player list for selected game */
