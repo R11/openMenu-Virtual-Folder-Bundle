@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <stdio.h>
 
 /* Helper functions */
 
@@ -130,6 +131,10 @@ bool dcnow_json_parse(const char* json_str, json_dcnow_t* result) {
     users_val = skip_whitespace(users_val);
 
     /* Parse each user and aggregate games */
+    int user_count = 0;
+    int users_with_games = 0;
+    int users_without_games = 0;
+
     while (*users_val && *users_val != ']') {
         users_val = skip_whitespace(users_val);
 
@@ -137,6 +142,7 @@ bool dcnow_json_parse(const char* json_str, json_dcnow_t* result) {
             break;  /* Not an object */
         }
         users_val++;  /* Skip opening brace */
+        user_count++;
 
         /* Find current_game_display field */
         const char* game_val = find_key(users_val, "current_game_display");
@@ -145,6 +151,8 @@ bool dcnow_json_parse(const char* json_str, json_dcnow_t* result) {
             const char* next = parse_string(game_val, game_name, JSON_MAX_NAME_LEN);
 
             if (next && game_name[0] != '\0') {
+                users_with_games++;
+
                 /* Find existing game or add new one */
                 int found_idx = -1;
                 for (int i = 0; i < result->game_count; i++) {
@@ -164,7 +172,17 @@ bool dcnow_json_parse(const char* json_str, json_dcnow_t* result) {
                     result->games[result->game_count].players = 1;
                     result->game_count++;
                 }
+            } else {
+                users_without_games++;
+                printf("DC Now: User %d has empty current_game_display\n", user_count);
             }
+        } else if (game_val && *game_val == 'n') {
+            /* Likely null value */
+            users_without_games++;
+            printf("DC Now: User %d has null current_game_display\n", user_count);
+        } else {
+            users_without_games++;
+            printf("DC Now: User %d missing current_game_display field\n", user_count);
         }
 
         /* Skip to end of user object */
@@ -181,6 +199,10 @@ bool dcnow_json_parse(const char* json_str, json_dcnow_t* result) {
             users_val++;
         }
     }
+
+    printf("DC Now: Parsed %d users total - %d with games, %d without games\n",
+           user_count, users_with_games, users_without_games);
+    printf("DC Now: Total players from API: %d\n", result->total_players);
 
     result->valid = true;
     return true;
