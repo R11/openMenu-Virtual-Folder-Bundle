@@ -136,6 +136,10 @@ bool dcnow_json_parse(const char* json_str, json_dcnow_t* result) {
     int users_with_games = 0;
     int users_without_games = 0;
 
+    /* Array to store idle player usernames */
+    char idle_player_names[JSON_MAX_PLAYERS_PER_GAME][JSON_MAX_USERNAME_LEN];
+    int idle_player_count = 0;
+
     while (*users_val && *users_val != ']') {
         users_val = skip_whitespace(users_val);
 
@@ -209,9 +213,14 @@ bool dcnow_json_parse(const char* json_str, json_dcnow_t* result) {
         }
 
         if (!has_game) {
-            /* User is idle/not in a game - count them separately */
+            /* User is idle/not in a game - store their username */
             users_without_games++;
-            printf("DC Now: User %d is idle/not in game\n", user_count);
+            if (idle_player_count < JSON_MAX_PLAYERS_PER_GAME && username[0] != '\0') {
+                strncpy(idle_player_names[idle_player_count], username, JSON_MAX_USERNAME_LEN - 1);
+                idle_player_names[idle_player_count][JSON_MAX_USERNAME_LEN - 1] = '\0';
+                idle_player_count++;
+            }
+            printf("DC Now: User %d (%s) is idle/not in game\n", user_count, username);
         }
 
         /* Skip to end of user object */
@@ -239,6 +248,13 @@ bool dcnow_json_parse(const char* json_str, json_dcnow_t* result) {
         result->games[result->game_count].name[JSON_MAX_NAME_LEN - 1] = '\0';
         result->games[result->game_count].code[0] = '\0';  /* No box art for idle users */
         result->games[result->game_count].players = users_without_games;
+
+        /* Copy idle player usernames */
+        for (int i = 0; i < idle_player_count && i < JSON_MAX_PLAYERS_PER_GAME; i++) {
+            strncpy(result->games[result->game_count].player_names[i], idle_player_names[i], JSON_MAX_USERNAME_LEN - 1);
+            result->games[result->game_count].player_names[i][JSON_MAX_USERNAME_LEN - 1] = '\0';
+        }
+
         result->game_count++;
     }
 
