@@ -2051,14 +2051,20 @@ handle_input_dcnow(enum control input) {
                 /* Go back to game list */
                 printf("DC Now: Going back to game list\n");
                 dcnow_view = DCNOW_VIEW_GAMES;
-                dcnow_choice = dcnow_selected_game;
+                /* Restore previous selection, ensuring it's valid */
+                if (dcnow_selected_game >= 0 && dcnow_selected_game < dcnow_data.game_count) {
+                    dcnow_choice = dcnow_selected_game;
+                } else {
+                    dcnow_choice = 0;
+                }
                 dcnow_scroll_offset = 0;
                 dcnow_selected_game = -1;
-            } else {
-                /* Close DC Now menu */
-                printf("DC Now: Closing DC Now menu\n");
-                *state_ptr = DRAW_UI;
+                /* DO NOT close the menu - just return to games view */
+                return;  /* Early return to prevent any further processing */
             }
+            /* If we reach here, we're in games view, so close the menu */
+            printf("DC Now: Closing DC Now menu\n");
+            *state_ptr = DRAW_UI;
         } break;
         case START: {
             /* START button: Do nothing (let it close the menu naturally) */
@@ -2172,8 +2178,13 @@ draw_dcnow_tr(void) {
         font_bmp_begin_draw();
         font_bmp_set_color(menu_title_color);
 
-        /* Title */
-        const char* title = "Dreamcast Live - Online Now";
+        /* Title with debug view indicator */
+        char title[64];
+        if (dcnow_view == DCNOW_VIEW_PLAYERS) {
+            snprintf(title, sizeof(title), "Dreamcast Live - Player List");
+        } else {
+            snprintf(title, sizeof(title), "Dreamcast Live - Online Now");
+        }
         int title_x = x + (width / 2) - ((strlen(title) * 8) / 2);
         font_bmp_draw_main(title_x, cur_y, title);
 
@@ -2375,8 +2386,12 @@ draw_dcnow_tr(void) {
         font_bmf_begin_draw();
         font_bmf_set_height_default();
 
-        /* Title */
-        font_bmf_draw_centered(x + width / 2, cur_y, text_color, "Dreamcast Live - Online Now");
+        /* Title with debug view indicator */
+        if (dcnow_view == DCNOW_VIEW_PLAYERS) {
+            font_bmf_draw_centered(x + width / 2, cur_y, text_color, "Dreamcast Live - Player List");
+        } else {
+            font_bmf_draw_centered(x + width / 2, cur_y, text_color, "Dreamcast Live - Online Now");
+        }
         cur_y += title_gap;
 
         if (dcnow_is_loading) {
