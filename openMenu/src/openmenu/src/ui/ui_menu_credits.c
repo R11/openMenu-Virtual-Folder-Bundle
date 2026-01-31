@@ -1874,7 +1874,7 @@ static int* dcnow_navigate_timeout = NULL;  /* Pointer to navigate timeout for i
 #define DCNOW_INPUT_TIMEOUT_INITIAL (10)
 #define DCNOW_INPUT_TIMEOUT_REPEAT (4)
 
-/* Visual callback for network connection status - renders full scene */
+/* Visual callback for network connection status - renders full scene with stunning visuals */
 static void dcnow_connection_status_callback(const char* message) {
     /* Render a single frame with the status message */
     pvr_wait_ready();
@@ -1884,8 +1884,8 @@ static void dcnow_connection_status_callback(const char* message) {
     draw_set_list(PVR_LIST_OP_POLY);
     pvr_list_begin(PVR_LIST_OP_POLY);
 
-    /* Full screen dark background */
-    draw_draw_quad(0, 0, 640, 480, 0xFF202020);
+    /* Full screen dark background with gradient effect */
+    draw_draw_quad(0, 0, 640, 480, 0xFF1A1A2E);
 
     pvr_list_finish();
 
@@ -1893,20 +1893,68 @@ static void dcnow_connection_status_callback(const char* message) {
     draw_set_list(PVR_LIST_TR_POLY);
     pvr_list_begin(PVR_LIST_TR_POLY);
 
-    /* White border box */
-    const int border_width = 4;
-    draw_draw_quad(140 - border_width, 190 - border_width,
-                   360 + (2 * border_width), 100 + (2 * border_width),
-                   0xFFFFFFFF);
+    /* Stunning multi-layer border effect */
+    const int border_width = 6;
+    const int box_x = 120;
+    const int box_y = 180;
+    const int box_width = 400;
+    const int box_height = 120;
 
-    /* Black background box */
-    draw_draw_quad(140, 190, 360, 100, 0xFF000000);
+    /* Outer glow - cyan */
+    draw_draw_quad(box_x - border_width - 2, box_y - border_width - 2,
+                   box_width + (2 * (border_width + 2)), box_height + (2 * (border_width + 2)),
+                   0x4000DDFF);
 
-    /* Draw text - white on black (roughly centered) */
+    /* Main border - bright cyan gradient effect */
+    draw_draw_quad(box_x - border_width, box_y - border_width,
+                   box_width + (2 * border_width), box_height + (2 * border_width),
+                   0xFF00DDFF);
+
+    /* Inner border accent - electric blue */
+    draw_draw_quad(box_x - (border_width / 2), box_y - (border_width / 2),
+                   box_width + border_width, box_height + border_width,
+                   0xFF0099FF);
+
+    /* Deep blue-black background with slight transparency for depth */
+    draw_draw_quad(box_x, box_y, box_width, box_height, 0xF0001133);
+
+    /* Draw text with color coding based on message content */
     font_bmp_begin_draw();
-    font_bmp_set_color(0xFFFFFFFF);
-    font_bmp_draw_main(240, 215, "DC Now");
-    font_bmp_draw_main(200, 240, message);
+
+    /* Title in bright cyan */
+    font_bmp_set_color(0xFF00DDFF);
+    font_bmp_draw_main(280, 200, "DC Now");
+
+    /* Determine message color based on content */
+    uint32_t msg_color = 0xFFFFFFFF;  /* Default: white */
+    if (strstr(message, "Initializing") || strstr(message, "Setting")) {
+        msg_color = 0xFF00AAFF;  /* Blue for initialization */
+    } else if (strstr(message, "Dialing") || strstr(message, "Connecting")) {
+        msg_color = 0xFFFFAA00;  /* Orange for active connection */
+    } else if (strstr(message, "Connected") || strstr(message, "ready")) {
+        msg_color = 0xFF00FF66;  /* Green for success */
+    } else if (strstr(message, "failed") || strstr(message, "Failed")) {
+        msg_color = 0xFFFF3333;  /* Red for errors */
+    }
+
+    font_bmp_set_color(msg_color);
+    /* Center the message horizontally */
+    int msg_len = strlen(message);
+    int msg_x = 320 - (msg_len * 8 / 2);
+    font_bmp_draw_main(msg_x, 235, message);
+
+    /* Progress indicator dots for active states */
+    if (strstr(message, "Dialing") || strstr(message, "Connecting") ||
+        strstr(message, "Initializing") || strstr(message, "Setting")) {
+        font_bmp_set_color(0xFF00DDFF);
+        static int dot_count = 0;
+        dot_count = (dot_count + 1) % 4;
+        char dots[5] = "";
+        for (int i = 0; i < dot_count; i++) {
+            strcat(dots, ".");
+        }
+        font_bmp_draw_main(320, 260, dots);
+    }
 
     pvr_list_finish();
     pvr_scene_finish();
@@ -2221,7 +2269,21 @@ draw_dcnow_tr(void) {
         const int y = (480 / 2) - (height / 2);
         const int x_item = x + (padding / 2);
 
+        /* Draw stunning DC Now popup with enhanced visuals */
         draw_popup_menu(x, y, width, height);
+
+        /* Add cyan accent border for DC Now popup */
+        const int accent_offset = 3;
+        draw_draw_quad(x - accent_offset, y - accent_offset, width + (2 * accent_offset), 2, 0xFF00DDFF);  /* Top */
+        draw_draw_quad(x - accent_offset, y + height + accent_offset - 2, width + (2 * accent_offset), 2, 0xFF00DDFF);  /* Bottom */
+        draw_draw_quad(x - accent_offset, y - accent_offset, 2, height + (2 * accent_offset), 0xFF00DDFF);  /* Left */
+        draw_draw_quad(x + width + accent_offset - 2, y - accent_offset, 2, height + (2 * accent_offset), 0xFF00DDFF);  /* Right */
+
+        /* Add Dreamcast button color corner accents */
+        draw_draw_quad(x - 6, y - 6, 8, 8, 0xFFDD2222);  /* Top-left - RED (A button) */
+        draw_draw_quad(x + width - 2, y - 6, 8, 8, 0xFF3399FF);  /* Top-right - BLUE (B button) */
+        draw_draw_quad(x - 6, y + height - 2, 8, 8, 0xFF00DD00);  /* Bottom-left - GREEN (Y button) */
+        draw_draw_quad(x + width - 2, y + height - 2, 8, 8, 0xFFFFCC00);  /* Bottom-right - YELLOW (X button) */
 
         int cur_y = y + 2;
         font_bmp_begin_draw();
@@ -2399,20 +2461,75 @@ draw_dcnow_tr(void) {
 
         /* Separator line before instructions */
         cur_y += 4;
-        font_bmp_set_color(0xFFBBBBBB);  /* Light gray for separator */
+        font_bmp_set_color(0xFF00DDFF);  /* Cyan for separator */
         font_bmp_draw_main(x_item, cur_y, "----------------------------------------");
         cur_y += line_height;
 
-        /* Instructions */
-        font_bmp_set_color(0xFFBBBBBB);  /* Light gray for instructions */
+        /* Instructions with stunning Dreamcast button color-coding */
+        int instr_x = x_item;
         if (dcnow_view == DCNOW_VIEW_PLAYERS) {
-            font_bmp_draw_main(x_item, cur_y, "X=Back to Home  |  B=Close Menu");
+            /* X button - YELLOW */
+            font_bmp_set_color(0xFFFFCC00);
+            font_bmp_draw_main(instr_x, cur_y, "X");
+            instr_x += 8;
+            font_bmp_set_color(0xFFCCCCCC);
+            font_bmp_draw_main(instr_x, cur_y, "=Back to Home  |  ");
+            instr_x += 18 * 8;
+            /* B button - BLUE */
+            font_bmp_set_color(0xFF3399FF);
+            font_bmp_draw_main(instr_x, cur_y, "B");
+            instr_x += 8;
+            font_bmp_set_color(0xFFCCCCCC);
+            font_bmp_draw_main(instr_x, cur_y, "=Close Menu");
         } else if (!dcnow_net_initialized) {
-            font_bmp_draw_main(x_item, cur_y, "Push A to Connect  |  Push B to Close");
+            /* A button - RED */
+            font_bmp_set_color(0xFFDD2222);
+            font_bmp_draw_main(instr_x, cur_y, "A");
+            instr_x += 8;
+            font_bmp_set_color(0xFFCCCCCC);
+            font_bmp_draw_main(instr_x, cur_y, "=Connect  |  ");
+            instr_x += 13 * 8;
+            /* B button - BLUE */
+            font_bmp_set_color(0xFF3399FF);
+            font_bmp_draw_main(instr_x, cur_y, "B");
+            instr_x += 8;
+            font_bmp_set_color(0xFFCCCCCC);
+            font_bmp_draw_main(instr_x, cur_y, "=Close");
         } else if (!dcnow_data.data_valid) {
-            font_bmp_draw_main(x_item, cur_y, "Push A to Fetch  |  Push B to Close");
+            /* A button - RED */
+            font_bmp_set_color(0xFFDD2222);
+            font_bmp_draw_main(instr_x, cur_y, "A");
+            instr_x += 8;
+            font_bmp_set_color(0xFFCCCCCC);
+            font_bmp_draw_main(instr_x, cur_y, "=Fetch Data  |  ");
+            instr_x += 16 * 8;
+            /* B button - BLUE */
+            font_bmp_set_color(0xFF3399FF);
+            font_bmp_draw_main(instr_x, cur_y, "B");
+            instr_x += 8;
+            font_bmp_set_color(0xFFCCCCCC);
+            font_bmp_draw_main(instr_x, cur_y, "=Close");
         } else {
-            font_bmp_draw_main(x_item, cur_y, "A=Details  X=Refresh  B=Close");
+            /* A button - RED */
+            font_bmp_set_color(0xFFDD2222);
+            font_bmp_draw_main(instr_x, cur_y, "A");
+            instr_x += 8;
+            font_bmp_set_color(0xFFCCCCCC);
+            font_bmp_draw_main(instr_x, cur_y, "=Details  ");
+            instr_x += 10 * 8;
+            /* X button - YELLOW */
+            font_bmp_set_color(0xFFFFCC00);
+            font_bmp_draw_main(instr_x, cur_y, "X");
+            instr_x += 8;
+            font_bmp_set_color(0xFFCCCCCC);
+            font_bmp_draw_main(instr_x, cur_y, "=Refresh  ");
+            instr_x += 10 * 8;
+            /* B button - BLUE */
+            font_bmp_set_color(0xFF3399FF);
+            font_bmp_draw_main(instr_x, cur_y, "B");
+            instr_x += 8;
+            font_bmp_set_color(0xFFCCCCCC);
+            font_bmp_draw_main(instr_x, cur_y, "=Close");
         }
         cur_y += line_height;
 
@@ -2473,7 +2590,21 @@ draw_dcnow_tr(void) {
         const int y = (480 / 2) - (height / 2);
         const int x_item = x + 10;
 
+        /* Draw stunning DC Now popup with enhanced visuals */
         draw_popup_menu(x, y, width, height);
+
+        /* Add cyan accent border for DC Now popup */
+        const int accent_offset = 3;
+        draw_draw_quad(x - accent_offset, y - accent_offset, width + (2 * accent_offset), 2, 0xFF00DDFF);  /* Top */
+        draw_draw_quad(x - accent_offset, y + height + accent_offset - 2, width + (2 * accent_offset), 2, 0xFF00DDFF);  /* Bottom */
+        draw_draw_quad(x - accent_offset, y - accent_offset, 2, height + (2 * accent_offset), 0xFF00DDFF);  /* Left */
+        draw_draw_quad(x + width + accent_offset - 2, y - accent_offset, 2, height + (2 * accent_offset), 0xFF00DDFF);  /* Right */
+
+        /* Add Dreamcast button color corner accents */
+        draw_draw_quad(x - 6, y - 6, 8, 8, 0xFFDD2222);  /* Top-left - RED (A button) */
+        draw_draw_quad(x + width - 2, y - 6, 8, 8, 0xFF3399FF);  /* Top-right - BLUE (B button) */
+        draw_draw_quad(x - 6, y + height - 2, 8, 8, 0xFF00DD00);  /* Bottom-left - GREEN (Y button) */
+        draw_draw_quad(x + width - 2, y + height - 2, 8, 8, 0xFFFFCC00);  /* Bottom-right - YELLOW (X button) */
 
         int cur_y = y + 2;
         font_bmf_begin_draw();
@@ -2636,18 +2767,56 @@ draw_dcnow_tr(void) {
 
         /* Separator line before instructions */
         cur_y += 6;
-        font_bmf_draw(x_item, cur_y, 0xFFBBBBBB, "----------------------------------------");  /* Light gray */
+        font_bmf_draw(x_item, cur_y, 0xFF00DDFF, "----------------------------------------");  /* Cyan separator */
         cur_y += line_height;
 
-        /* Instructions */
+        /* Instructions with stunning Dreamcast button color-coding */
+        int instr_x = x_item;
         if (dcnow_view == DCNOW_VIEW_PLAYERS) {
-            font_bmf_draw(x_item, cur_y, 0xFFBBBBBB, "X=Back to Home  |  B=Close Menu");  /* Light gray */
+            /* X button - YELLOW */
+            font_bmf_draw(instr_x, cur_y, 0xFFFFCC00, "X");
+            instr_x += 12;
+            font_bmf_draw(instr_x, cur_y, 0xFFCCCCCC, "=Back to Home  |  ");
+            instr_x += 180;
+            /* B button - BLUE */
+            font_bmf_draw(instr_x, cur_y, 0xFF3399FF, "B");
+            instr_x += 12;
+            font_bmf_draw(instr_x, cur_y, 0xFFCCCCCC, "=Close Menu");
         } else if (!dcnow_net_initialized) {
-            font_bmf_draw(x_item, cur_y, 0xFFBBBBBB, "Push A to Connect  |  Push B to Close");  /* Light gray */
+            /* A button - RED */
+            font_bmf_draw(instr_x, cur_y, 0xFFDD2222, "A");
+            instr_x += 12;
+            font_bmf_draw(instr_x, cur_y, 0xFFCCCCCC, "=Connect  |  ");
+            instr_x += 130;
+            /* B button - BLUE */
+            font_bmf_draw(instr_x, cur_y, 0xFF3399FF, "B");
+            instr_x += 12;
+            font_bmf_draw(instr_x, cur_y, 0xFFCCCCCC, "=Close");
         } else if (!dcnow_data.data_valid) {
-            font_bmf_draw(x_item, cur_y, 0xFFBBBBBB, "Push A to Fetch  |  Push B to Close");  /* Light gray */
+            /* A button - RED */
+            font_bmf_draw(instr_x, cur_y, 0xFFDD2222, "A");
+            instr_x += 12;
+            font_bmf_draw(instr_x, cur_y, 0xFFCCCCCC, "=Fetch Data  |  ");
+            instr_x += 160;
+            /* B button - BLUE */
+            font_bmf_draw(instr_x, cur_y, 0xFF3399FF, "B");
+            instr_x += 12;
+            font_bmf_draw(instr_x, cur_y, 0xFFCCCCCC, "=Close");
         } else {
-            font_bmf_draw(x_item, cur_y, 0xFFBBBBBB, "A=Details  X=Refresh  B=Close");  /* Light gray */
+            /* A button - RED */
+            font_bmf_draw(instr_x, cur_y, 0xFFDD2222, "A");
+            instr_x += 12;
+            font_bmf_draw(instr_x, cur_y, 0xFFCCCCCC, "=Details  ");
+            instr_x += 100;
+            /* X button - YELLOW */
+            font_bmf_draw(instr_x, cur_y, 0xFFFFCC00, "X");
+            instr_x += 12;
+            font_bmf_draw(instr_x, cur_y, 0xFFCCCCCC, "=Refresh  ");
+            instr_x += 100;
+            /* B button - BLUE */
+            font_bmf_draw(instr_x, cur_y, 0xFF3399FF, "B");
+            instr_x += 12;
+            font_bmf_draw(instr_x, cur_y, 0xFFCCCCCC, "=Close");
         }
         cur_y += line_height;
     }
