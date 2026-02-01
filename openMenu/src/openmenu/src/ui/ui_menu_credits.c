@@ -2468,19 +2468,12 @@ draw_dcnow_tr(void) {
         /* Instructions with stunning Dreamcast button color-coding */
         int instr_x = x_item;
         if (dcnow_view == DCNOW_VIEW_PLAYERS) {
-            /* X button - YELLOW */
-            font_bmp_set_color(0xFFFFCC00);
-            font_bmp_draw_main(instr_x, cur_y, "X");
-            instr_x += 8;
-            font_bmp_set_color(0xFFCCCCCC);
-            font_bmp_draw_main(instr_x, cur_y, "=Back to Home  |  ");
-            instr_x += 18 * 8;
             /* B button - BLUE */
             font_bmp_set_color(0xFF3399FF);
             font_bmp_draw_main(instr_x, cur_y, "B");
             instr_x += 8;
             font_bmp_set_color(0xFFCCCCCC);
-            font_bmp_draw_main(instr_x, cur_y, "=Close Menu");
+            font_bmp_draw_main(instr_x, cur_y, "=Back");
         } else if (!dcnow_net_initialized) {
             /* A button - RED */
             font_bmp_set_color(0xFFDD2222);
@@ -2773,15 +2766,10 @@ draw_dcnow_tr(void) {
         /* Instructions with stunning Dreamcast button color-coding */
         int instr_x = x_item;
         if (dcnow_view == DCNOW_VIEW_PLAYERS) {
-            /* X button - YELLOW */
-            font_bmf_draw(instr_x, cur_y, 0xFFFFCC00, "X");
-            instr_x += 12;
-            font_bmf_draw(instr_x, cur_y, 0xFFCCCCCC, "=Back to Home  |  ");
-            instr_x += 180;
             /* B button - BLUE */
             font_bmf_draw(instr_x, cur_y, 0xFF3399FF, "B");
             instr_x += 12;
-            font_bmf_draw(instr_x, cur_y, 0xFFCCCCCC, "=Close Menu");
+            font_bmf_draw(instr_x, cur_y, 0xFFCCCCCC, "=Back");
         } else if (!dcnow_net_initialized) {
             /* A button - RED */
             font_bmf_draw(instr_x, cur_y, 0xFFDD2222, "A");
