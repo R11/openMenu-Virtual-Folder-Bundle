@@ -32,6 +32,7 @@
 #include "ui/ui_common.h"
 #include "ui/ui_menu_credits.h"
 #include "vm2/vm2_api.h"
+#include "dcnow/dcnow_net_init.h"
 
 /* UI Collection */
 #include "ui/ui_grid.h"
@@ -274,6 +275,21 @@ static int
 translate_input(void) {
     processInput();
 
+    /* Check for ABXY+Start reset combo - disconnect modem and reset console */
+    if (INPT_ButtonEx(BTN_A, BTN_HELD) &&
+        INPT_ButtonEx(BTN_B, BTN_HELD) &&
+        INPT_ButtonEx(BTN_X, BTN_HELD) &&
+        INPT_ButtonEx(BTN_Y, BTN_HELD) &&
+        INPT_ButtonEx(BTN_START, BTN_HELD)) {
+        printf("ABXY+Start detected - disconnecting and resetting...\n");
+
+        /* Disconnect modem/PPP before reset */
+        dcnow_net_disconnect();
+
+        /* Reset console - same as exit to BIOS */
+        arch_exec_at(bloader_data, bloader_size, 0xacf00000);
+    }
+
     /* D-Pad directions */
     if (INPT_DPADDirection(DPAD_LEFT)) {
         return LEFT;
@@ -462,6 +478,9 @@ main(int argc, char* argv[]) {
 
 void
 exit_to_bios_ex(int do_mount, int do_send_id) {
+    /* Disconnect modem/PPP before exiting to ensure clean state */
+    dcnow_net_disconnect();
+
     bloader_cfg_t* bloader_config = (bloader_cfg_t*)&bloader_data[bloader_size - sizeof(bloader_cfg_t)];
 
     bloader_config->enable_wide = sf_aspect[0];

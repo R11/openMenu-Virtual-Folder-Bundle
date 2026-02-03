@@ -42,4 +42,18 @@ void dcnow_set_status_callback(dcnow_status_callback_t callback);
  */
 int dcnow_net_early_init(void);
 
+/**
+ * Disconnect and reset the network connection (modem/PPP)
+ *
+ * This function should be called before:
+ * - Exiting to BIOS
+ * - Launching a game
+ * - Launching CodeBreaker
+ * - Console reset
+ *
+ * It will properly shutdown the PPP connection and modem hardware
+ * to ensure clean state when returning to OpenMenu or other operations.
+ */
+void dcnow_net_disconnect(void);
+
 #endif /* DCNOW_NET_INIT_H */

@@ -115,3 +115,43 @@ int dcnow_net_early_init(void) {
     return -1;
 #endif
 }
+
+void dcnow_net_disconnect(void) {
+#ifdef _arch_dreamcast
+    printf("DC Now: Disconnecting network...\n");
+
+    /* Log to RAM disk for debugging */
+    FILE* logfile = fopen("/ram/DCNOW_LOG.TXT", "a");
+    if (logfile) {
+        fprintf(logfile, "Disconnecting network...\n");
+        fclose(logfile);
+    }
+
+    /* Check if we have a network device */
+    if (!net_default_dev) {
+        printf("DC Now: No network device to disconnect\n");
+        return;
+    }
+
+    /* Check if it's a PPP connection (modem) */
+    if (strncmp(net_default_dev->name, "ppp", 3) == 0) {
+        printf("DC Now: Shutting down PPP connection...\n");
+        ppp_shutdown();
+
+        printf("DC Now: Shutting down modem hardware...\n");
+        modem_shutdown();
+
+        printf("DC Now: Modem and PPP disconnected\n");
+
+        if (logfile = fopen("/ram/DCNOW_LOG.TXT", "a")) {
+            fprintf(logfile, "PPP and modem disconnected successfully\n");
+            fclose(logfile);
+        }
+    } else {
+        /* BBA doesn't need special disconnect handling */
+        printf("DC Now: Network device is not modem (BBA), no disconnect needed\n");
+    }
+#else
+    /* Non-Dreamcast - nothing to do */
+#endif
+}
