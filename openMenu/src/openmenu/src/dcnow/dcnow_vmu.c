@@ -87,6 +87,9 @@ static const unsigned char vmu_font_3x5[][5] = {
 static void vmu_set_pixel(int x, int y, int on) {
     if (x < 0 || x >= 48 || y < 0 || y >= 32) return;
 
+    /* Flip Y to fix upside-down display */
+    y = 31 - y;
+
     int byte_index = (y * 48 + x) / 8;
     int bit_index = 7 - ((y * 48 + x) % 8);
 

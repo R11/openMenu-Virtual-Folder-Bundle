@@ -2134,8 +2134,6 @@ handle_input_dcnow(enum control input) {
             }
             /* If we reach here, we're in games view, so close the menu */
             printf("DC Now: Closing DC Now menu\n");
-            /* Restore VMU to OpenMenu logo when closing DC Now menu */
-            dcnow_vmu_restore_logo();
             *state_ptr = DRAW_UI;
             /* Set timeout after closing menu */
             if (dcnow_navigate_timeout) *dcnow_navigate_timeout = DCNOW_INPUT_TIMEOUT_INITIAL;
@@ -2290,7 +2288,6 @@ draw_dcnow_tr(void) {
         /* Add Dreamcast button color corner accents */
         draw_draw_quad(x - 6, y - 6, 8, 8, 0xFFDD2222);  /* Top-left - RED (A button) */
         draw_draw_quad(x + width - 2, y - 6, 8, 8, 0xFF3399FF);  /* Top-right - BLUE (B button) */
-        draw_draw_quad(x - 6, y + height - 2, 8, 8, 0xFF00DD00);  /* Bottom-left - GREEN (Y button) */
         draw_draw_quad(x + width - 2, y + height - 2, 8, 8, 0xFFFFCC00);  /* Bottom-right - YELLOW (X button) */
 
         int cur_y = y + 2;
@@ -2623,7 +2620,6 @@ draw_dcnow_tr(void) {
         /* Add Dreamcast button color corner accents */
         draw_draw_quad(x - 6, y - 6, 8, 8, 0xFFDD2222);  /* Top-left - RED (A button) */
         draw_draw_quad(x + width - 2, y - 6, 8, 8, 0xFF3399FF);  /* Top-right - BLUE (B button) */
-        draw_draw_quad(x - 6, y + height - 2, 8, 8, 0xFF00DD00);  /* Bottom-left - GREEN (Y button) */
         draw_draw_quad(x + width - 2, y + height - 2, 8, 8, 0xFFFFCC00);  /* Bottom-right - YELLOW (X button) */
 
         int cur_y = y + 2;
