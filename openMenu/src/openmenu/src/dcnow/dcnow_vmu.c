@@ -18,6 +18,9 @@ static bool dcnow_vmu_active = false;
 /* VMU bitmap buffer for DC Now display (48x32 pixels = 192 bytes) */
 static unsigned char dcnow_vmu_bitmap[192] __attribute__((aligned(16)));
 
+/* Current frame of the refresh spinner animation (0-3) */
+static int dcnow_vmu_refresh_frame = 0;
+
 /* Simple 3x5 font for rendering text on VMU
  * Each character is 3 pixels wide, 5 pixels tall
  * Format: 5 bytes per char (5 rows, 3 pixels per row stored in lower 3 bits) */
@@ -141,6 +144,62 @@ static void vmu_draw_string(int x, int y, const char *str) {
     }
 }
 
+/* Draw the current spinner frame into a 3x5 pixel area at (x, y).
+ * Patterns: 0=horizontal, 1=backslash, 2=vertical, 3=forward-slash */
+static void vmu_draw_spinner(int x, int y) {
+    switch (dcnow_vmu_refresh_frame) {
+        case 0: /* — */
+            vmu_set_pixel(x,     y + 2, 1);
+            vmu_set_pixel(x + 1, y + 2, 1);
+            vmu_set_pixel(x + 2, y + 2, 1);
+            break;
+        case 1: /* \ */
+            vmu_set_pixel(x,     y,     1);
+            vmu_set_pixel(x + 1, y + 2, 1);
+            vmu_set_pixel(x + 2, y + 4, 1);
+            break;
+        case 2: /* | */
+            vmu_set_pixel(x + 1, y,     1);
+            vmu_set_pixel(x + 1, y + 1, 1);
+            vmu_set_pixel(x + 1, y + 2, 1);
+            vmu_set_pixel(x + 1, y + 3, 1);
+            vmu_set_pixel(x + 1, y + 4, 1);
+            break;
+        case 3: /* / */
+            vmu_set_pixel(x,     y + 4, 1);
+            vmu_set_pixel(x + 1, y + 2, 1);
+            vmu_set_pixel(x + 2, y,     1);
+            break;
+    }
+}
+
+/* Overlay the refresh spinner onto the current bitmap and push to VMU */
+static void vmu_overlay_refresh_indicator(void) {
+    if (!dcnow_vmu_active) {
+        /* Nothing on VMU yet — render a base placeholder */
+        memset(dcnow_vmu_bitmap, 0, sizeof(dcnow_vmu_bitmap));
+        vmu_draw_string(2, 1, "DCNOW");
+        vmu_draw_string(2, 7, "FETCHING");
+    }
+    /* else: bitmap still holds the last game-list frame; leave it intact */
+
+    /* Clear the 3x5 spinner cell next to the DCNOW title (x=24, y=1) */
+    for (int dy = 0; dy < 5; dy++) {
+        for (int dx = 0; dx < 3; dx++) {
+            vmu_set_pixel(24 + dx, 1 + dy, 0);
+        }
+    }
+
+    /* Draw current spinner frame, then advance */
+    vmu_draw_spinner(24, 1);
+    dcnow_vmu_refresh_frame = (dcnow_vmu_refresh_frame + 1) % 4;
+
+    /* Push to hardware */
+    uint8_t vmu_screens = crayon_peripheral_dreamcast_get_screens();
+    crayon_peripheral_vmu_display_icon(vmu_screens, dcnow_vmu_bitmap);
+    dcnow_vmu_active = true;
+}
+
 /* Render DC Now games list to VMU bitmap */
 static void vmu_render_games_list(const dcnow_data_t *data) {
     /* Clear the bitmap */
@@ -229,4 +288,10 @@ void dcnow_vmu_restore_logo(void) {
 
 bool dcnow_vmu_is_active(void) {
     return dcnow_vmu_active;
+}
+
+void dcnow_vmu_show_refreshing(void) {
+#ifdef _arch_dreamcast
+    vmu_overlay_refresh_indicator();
+#endif
 }

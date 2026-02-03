@@ -24,4 +24,13 @@ void dcnow_vmu_restore_logo(void);
  */
 bool dcnow_vmu_is_active(void);
 
+/**
+ * Show a refresh/fetching indicator on the VMU display.
+ * Overlays a spinning animation next to the DCNOW title on the current
+ * VMU content.  If no game data has been displayed yet, a placeholder
+ * screen is rendered first.  Safe to call repeatedly — each call advances
+ * the spinner by one frame.
+ */
+void dcnow_vmu_show_refreshing(void);
+
 #endif /* DCNOW_VMU_H */

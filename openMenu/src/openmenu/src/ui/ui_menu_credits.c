@@ -1774,6 +1774,7 @@ draw_psx_launcher_tr(void) {
 #include "../dcnow/dcnow_api.h"
 #include "../dcnow/dcnow_net_init.h"
 #include "../dcnow/dcnow_vmu.h"
+#include <arch/timer.h>
 #include "../texture/txr_manager.h"
 
 extern image img_empty_boxart;  /* Defined in draw_kos.c */
@@ -1872,8 +1873,14 @@ static bool dcnow_net_initialized = false;
 static char connection_status[128] = "";
 static int* dcnow_navigate_timeout = NULL;  /* Pointer to navigate timeout for input debouncing */
 
+/* Timestamp (ms) of the last successful fetch — 0 until first fetch completes */
+static uint64_t dcnow_last_fetch_ms = 0;
+/* Scratch buffer for auto-refresh so old data survives a failed fetch */
+static dcnow_data_t dcnow_temp_data;
+
 #define DCNOW_INPUT_TIMEOUT_INITIAL (10)
 #define DCNOW_INPUT_TIMEOUT_REPEAT (4)
+#define DCNOW_AUTO_REFRESH_MS       60000  /* 60 seconds between auto-refreshes */
 
 /* Visual callback for network connection status - renders full scene with stunning visuals */
 static void dcnow_connection_status_callback(const char* message) {
@@ -1985,6 +1992,9 @@ dcnow_setup(enum draw_state* state, struct theme_color* _colors, int* timeout_pt
     if (dcnow_net_initialized && !dcnow_data_fetched && !dcnow_is_loading) {
         dcnow_is_loading = true;
 
+        /* Show VMU refresh indicator while we block on the fetch */
+        dcnow_vmu_show_refreshing();
+
         /* Attempt to fetch fresh data from dreamcast.online/now */
         int result = dcnow_fetch_data(&dcnow_data, 5000);  /* 5 second timeout */
 
@@ -1992,6 +2002,7 @@ dcnow_setup(enum draw_state* state, struct theme_color* _colors, int* timeout_pt
             dcnow_data_fetched = true;
             /* Update VMU display with games list */
             dcnow_vmu_update_display(&dcnow_data);
+            dcnow_last_fetch_ms = timer_ms_gettime64();
         } else {
             /* Failed to fetch - try to use cached data */
             if (!dcnow_get_cached_data(&dcnow_data)) {
@@ -2183,6 +2194,24 @@ handle_input_dcnow(enum control input) {
                 if (dcnow_navigate_timeout) *dcnow_navigate_timeout = DCNOW_INPUT_TIMEOUT_INITIAL;
             }
         } break;
+        case TRIG_L:
+        case TRIG_R: {
+            /* L+R pressed together: manual refresh (same flow as X) */
+            if (INPT_TriggerPressed(TRIGGER_L) && INPT_TriggerPressed(TRIGGER_R)) {
+                if (dcnow_net_initialized && dcnow_data.data_valid) {
+                    printf("DC Now: L+R refresh requested\n");
+                    dcnow_data_fetched = false;
+                    dcnow_data.data_valid = false;
+                    dcnow_is_loading = true;
+                    dcnow_needs_fetch = true;
+                    dcnow_shown_loading = false;
+                    dcnow_view = DCNOW_VIEW_GAMES;
+                    dcnow_choice = 0;
+                    dcnow_scroll_offset = 0;
+                    if (dcnow_navigate_timeout) *dcnow_navigate_timeout = DCNOW_INPUT_TIMEOUT_INITIAL;
+                }
+            }
+        } break;
         default:
             break;
     }
@@ -2200,17 +2229,41 @@ draw_dcnow_tr(void) {
         dcnow_needs_fetch = false;
         printf("DC Now: Fetching data...\n");
 
+        /* Show VMU refresh indicator while we block on the network */
+        dcnow_vmu_show_refreshing();
+
         int result = dcnow_fetch_data(&dcnow_data, 5000);
         if (result == 0) {
             dcnow_data_fetched = true;
-            /* Update VMU display with games list */
             dcnow_vmu_update_display(&dcnow_data);
+            dcnow_last_fetch_ms = timer_ms_gettime64();
             printf("DC Now: Data refreshed successfully\n");
         } else {
             printf("DC Now: Data refresh failed: %d\n", result);
         }
 
         dcnow_is_loading = false;
+    }
+
+    /* Auto-refresh every 60 seconds while the popup is open with valid data */
+    if (dcnow_net_initialized && dcnow_data.data_valid && !dcnow_is_loading && dcnow_last_fetch_ms > 0) {
+        uint64_t now = timer_ms_gettime64();
+        if ((now - dcnow_last_fetch_ms) >= DCNOW_AUTO_REFRESH_MS) {
+            printf("DC Now: Auto-refresh triggered\n");
+            dcnow_vmu_show_refreshing();
+
+            int result = dcnow_fetch_data(&dcnow_temp_data, 5000);
+            if (result == 0) {
+                memcpy(&dcnow_data, &dcnow_temp_data, sizeof(dcnow_data));
+                dcnow_vmu_update_display(&dcnow_data);
+                printf("DC Now: Auto-refresh completed successfully\n");
+            } else {
+                /* Fetch failed — keep old data, restore old VMU display */
+                dcnow_vmu_update_display(&dcnow_data);
+                printf("DC Now: Auto-refresh failed: %d\n", result);
+            }
+            dcnow_last_fetch_ms = timer_ms_gettime64();
+        }
     }
 
     if (sf_ui[0] == UI_SCROLL || sf_ui[0] == UI_FOLDERS) {
@@ -2534,10 +2587,10 @@ draw_dcnow_tr(void) {
             font_bmp_set_color(0xFFCCCCCC);
             font_bmp_draw_main(instr_x, cur_y, "=Details  ");
             instr_x += 10 * 8;
-            /* X button - YELLOW */
+            /* X / LR buttons - YELLOW */
             font_bmp_set_color(0xFFFFCC00);
-            font_bmp_draw_main(instr_x, cur_y, "X");
-            instr_x += 8;
+            font_bmp_draw_main(instr_x, cur_y, "X|LR");
+            instr_x += 4 * 8;
             font_bmp_set_color(0xFFCCCCCC);
             font_bmp_draw_main(instr_x, cur_y, "=Refresh  ");
             instr_x += 10 * 8;
@@ -2836,9 +2889,9 @@ draw_dcnow_tr(void) {
             instr_x += 12;
             font_bmf_draw(instr_x, cur_y, 0xFFCCCCCC, "=Details  ");
             instr_x += 100;
-            /* X button - YELLOW */
-            font_bmf_draw(instr_x, cur_y, 0xFFFFCC00, "X");
-            instr_x += 12;
+            /* X / LR buttons - YELLOW */
+            font_bmf_draw(instr_x, cur_y, 0xFFFFCC00, "X|LR");
+            instr_x += 42;
             font_bmf_draw(instr_x, cur_y, 0xFFCCCCCC, "=Refresh  ");
             instr_x += 100;
             /* B button - BLUE */
