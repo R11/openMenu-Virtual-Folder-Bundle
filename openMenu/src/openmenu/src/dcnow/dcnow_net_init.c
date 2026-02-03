@@ -1,4 +1,5 @@
 #include "dcnow_net_init.h"
+#include "dcnow_vmu.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -119,6 +120,9 @@ int dcnow_net_early_init(void) {
 void dcnow_net_disconnect(void) {
 #ifdef _arch_dreamcast
     printf("DC Now: Disconnecting network...\n");
+
+    /* Restore VMU to OpenMenu logo when disconnecting */
+    dcnow_vmu_restore_logo();
 
     /* Log to RAM disk for debugging */
     FILE* logfile = fopen("/ram/DCNOW_LOG.TXT", "a");

@@ -1773,6 +1773,7 @@ draw_psx_launcher_tr(void) {
  */
 #include "../dcnow/dcnow_api.h"
 #include "../dcnow/dcnow_net_init.h"
+#include "../dcnow/dcnow_vmu.h"
 #include "../texture/txr_manager.h"
 
 extern image img_empty_boxart;  /* Defined in draw_kos.c */
@@ -1989,6 +1990,8 @@ dcnow_setup(enum draw_state* state, struct theme_color* _colors, int* timeout_pt
 
         if (result == 0) {
             dcnow_data_fetched = true;
+            /* Update VMU display with games list */
+            dcnow_vmu_update_display(&dcnow_data);
         } else {
             /* Failed to fetch - try to use cached data */
             if (!dcnow_get_cached_data(&dcnow_data)) {
@@ -2131,6 +2134,8 @@ handle_input_dcnow(enum control input) {
             }
             /* If we reach here, we're in games view, so close the menu */
             printf("DC Now: Closing DC Now menu\n");
+            /* Restore VMU to OpenMenu logo when closing DC Now menu */
+            dcnow_vmu_restore_logo();
             *state_ptr = DRAW_UI;
             /* Set timeout after closing menu */
             if (dcnow_navigate_timeout) *dcnow_navigate_timeout = DCNOW_INPUT_TIMEOUT_INITIAL;
@@ -2200,6 +2205,8 @@ draw_dcnow_tr(void) {
         int result = dcnow_fetch_data(&dcnow_data, 5000);
         if (result == 0) {
             dcnow_data_fetched = true;
+            /* Update VMU display with games list */
+            dcnow_vmu_update_display(&dcnow_data);
             printf("DC Now: Data refreshed successfully\n");
         } else {
             printf("DC Now: Data refresh failed: %d\n", result);
