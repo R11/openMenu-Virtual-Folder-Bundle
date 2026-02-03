@@ -49,10 +49,15 @@ int dcnow_net_early_init(void);
  * - Exiting to BIOS
  * - Launching a game
  * - Launching CodeBreaker
- * - Console reset
+ * - Console reset (ABXY+Start combo)
  *
  * It will properly shutdown the PPP connection and modem hardware
- * to ensure clean state when returning to OpenMenu or other operations.
+ * with appropriate delays to ensure hardware fully resets.
+ *
+ * After shutdown, net_default_dev is set to NULL so subsequent
+ * calls to dcnow_net_early_init() will properly reinitialize.
+ *
+ * Timing: ~1.5 seconds (500ms PPP shutdown + 1000ms modem reset)
  */
 void dcnow_net_disconnect(void);
 

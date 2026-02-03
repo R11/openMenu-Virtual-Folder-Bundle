@@ -138,15 +138,27 @@ void dcnow_net_disconnect(void) {
         printf("DC Now: Shutting down PPP connection...\n");
         ppp_shutdown();
 
+        /* Give PPP time to fully shut down */
+        timer_spin_sleep(500);
+
         printf("DC Now: Shutting down modem hardware...\n");
         modem_shutdown();
 
+        /* CRITICAL: Give modem hardware time to fully reset */
+        /* Without this delay, subsequent modem_init() calls may fail */
+        timer_spin_sleep(1000);
+
         printf("DC Now: Modem and PPP disconnected\n");
 
-        if (logfile = fopen("/ram/DCNOW_LOG.TXT", "a")) {
+        logfile = fopen("/ram/DCNOW_LOG.TXT", "a");
+        if (logfile) {
             fprintf(logfile, "PPP and modem disconnected successfully\n");
             fclose(logfile);
         }
+
+        /* Reset network state to NULL so future init knows to reinitialize */
+        net_default_dev = NULL;
+        printf("DC Now: Network state reset to NULL\n");
     } else {
         /* BBA doesn't need special disconnect handling */
         printf("DC Now: Network device is not modem (BBA), no disconnect needed\n");
