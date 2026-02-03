@@ -29,6 +29,7 @@
 
 /* External declaration for VM2/VMUPro/USB4Maple detection */
 #include <dc/maple.h>
+#include <kos/thread.h>
 extern int vm2_device_count;
 extern void vm2_rescan(void);
 
@@ -1875,8 +1876,45 @@ static int* dcnow_navigate_timeout = NULL;  /* Pointer to navigate timeout for i
 
 /* Timestamp (ms) of the last successful fetch — 0 until first fetch completes */
 static uint64_t dcnow_last_fetch_ms = 0;
-/* Scratch buffer for auto-refresh so old data survives a failed fetch */
+/* Scratch buffer for background refresh so old data survives a failed fetch */
 static dcnow_data_t dcnow_temp_data;
+
+/* NULL until the first successful fetch; set once, never cleared */
+static kthread_t* dcnow_bg_thread = NULL;
+
+/* Background refresh thread.  Spawned once after the first successful fetch.
+ * Sleeps 60 s, fetches into the scratch buffer, swaps on success.
+ * Never touches the render loop — the main thread keeps drawing normally
+ * the entire time the fetch is in flight. */
+static void*
+dcnow_bg_thread_fn(void* param) {
+    (void)param;
+    for (;;) {
+        thd_sleep(60000);  /* 60 seconds between refreshes */
+
+        /* Skip this cycle if network disappeared or a manual fetch is running */
+        if (!dcnow_net_initialized || dcnow_is_loading) {
+            continue;
+        }
+
+        /* Show spinner on VMU while we wait for the network round-trip */
+        dcnow_vmu_show_refreshing();
+
+        /* Fetch into scratch buffer — dcnow_data is untouched until success */
+        int result = dcnow_fetch_data(&dcnow_temp_data, 5000);
+        if (result == 0) {
+            memcpy(&dcnow_data, &dcnow_temp_data, sizeof(dcnow_data));
+            dcnow_vmu_update_display(&dcnow_data);
+            dcnow_last_fetch_ms = timer_ms_gettime64();
+            printf("DC Now: Background refresh OK\n");
+        } else {
+            /* Failed — restore VMU to last known good data */
+            dcnow_vmu_update_display(&dcnow_data);
+            printf("DC Now: Background refresh failed: %d\n", result);
+        }
+    }
+    return NULL;  /* never reached */
+}
 
 #define DCNOW_INPUT_TIMEOUT_INITIAL (10)
 #define DCNOW_INPUT_TIMEOUT_REPEAT (4)
@@ -2003,6 +2041,10 @@ dcnow_setup(enum draw_state* state, struct theme_color* _colors, int* timeout_pt
             /* Update VMU display with games list */
             dcnow_vmu_update_display(&dcnow_data);
             dcnow_last_fetch_ms = timer_ms_gettime64();
+            /* First successful fetch — kick off the background refresh thread */
+            if (!dcnow_bg_thread) {
+                dcnow_bg_thread = thd_create(0, dcnow_bg_thread_fn, NULL);
+            }
         } else {
             /* Failed to fetch - try to use cached data */
             if (!dcnow_get_cached_data(&dcnow_data)) {
@@ -2238,6 +2280,10 @@ draw_dcnow_tr(void) {
             dcnow_vmu_update_display(&dcnow_data);
             dcnow_last_fetch_ms = timer_ms_gettime64();
             printf("DC Now: Data refreshed successfully\n");
+            /* Kick off background refresh thread if not already running */
+            if (!dcnow_bg_thread) {
+                dcnow_bg_thread = thd_create(0, dcnow_bg_thread_fn, NULL);
+            }
         } else {
             printf("DC Now: Data refresh failed: %d\n", result);
         }
@@ -2245,26 +2291,7 @@ draw_dcnow_tr(void) {
         dcnow_is_loading = false;
     }
 
-    /* Auto-refresh every 60 seconds while the popup is open with valid data */
-    if (dcnow_net_initialized && dcnow_data.data_valid && !dcnow_is_loading && dcnow_last_fetch_ms > 0) {
-        uint64_t now = timer_ms_gettime64();
-        if ((now - dcnow_last_fetch_ms) >= DCNOW_AUTO_REFRESH_MS) {
-            printf("DC Now: Auto-refresh triggered\n");
-            dcnow_vmu_show_refreshing();
-
-            int result = dcnow_fetch_data(&dcnow_temp_data, 5000);
-            if (result == 0) {
-                memcpy(&dcnow_data, &dcnow_temp_data, sizeof(dcnow_data));
-                dcnow_vmu_update_display(&dcnow_data);
-                printf("DC Now: Auto-refresh completed successfully\n");
-            } else {
-                /* Fetch failed — keep old data, restore old VMU display */
-                dcnow_vmu_update_display(&dcnow_data);
-                printf("DC Now: Auto-refresh failed: %d\n", result);
-            }
-            dcnow_last_fetch_ms = timer_ms_gettime64();
-        }
-    }
+    /* Auto-refresh is now handled by dcnow_bg_thread — nothing to do here */
 
     if (sf_ui[0] == UI_SCROLL || sf_ui[0] == UI_FOLDERS) {
         /* Scroll/Folders mode - use bitmap font */

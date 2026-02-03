@@ -287,7 +287,7 @@ int dcnow_fetch_data(dcnow_data_t *data, uint32_t timeout_ms) {
         return -12;
     }
 
-    char response[8192];
+    static char response[8192];  /* static: too large for a thread stack */
     int result;
 
     printf("DC Now: Fetching data from dreamcast.online/now/api/users.json...\n");
@@ -381,7 +381,7 @@ int dcnow_fetch_data(dcnow_data_t *data, uint32_t timeout_ms) {
     printf("DC Now: Parsing JSON...\n");
 
     /* Parse JSON */
-    json_dcnow_t json_result;
+    static json_dcnow_t json_result;  /* static: ~37 KB, must not live on a thread stack */
     if (!dcnow_json_parse(json_start, &json_result)) {
         strcpy(data->error_message, "JSON parse error");
         data->data_valid = false;
