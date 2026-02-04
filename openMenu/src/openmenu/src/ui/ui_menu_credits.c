@@ -27,6 +27,9 @@
 
 #include "ui/ui_menu_credits.h"
 
+/* Include dcnow_vmu.h early for VMU setting changes */
+#include "../dcnow/dcnow_vmu.h"
+
 /* External declaration for VM2/VMUPro/USB4Maple detection */
 #include <dc/maple.h>
 extern int vm2_device_count;
@@ -439,12 +442,9 @@ menu_accept(void) {
             if (dcnow_vmu_is_active()) {
                 dcnow_vmu_restore_logo();
             }
-        } else {
-            /* Setting turned ON - update VMU with DC Now data if we have valid data */
-            if (dcnow_data.data_valid) {
-                dcnow_vmu_update_display(&dcnow_data);
-            }
         }
+        /* When turned ON, the VMU will be updated next time dcnow_vmu_update_display is called
+         * (e.g., when opening DC Now popup or on next data refresh) */
 
         if (choices[CHOICE_THEME] != UI_SCROLL && choices[CHOICE_THEME] != UI_FOLDERS && sf_region[0] > REGION_END) {
             sf_custom_theme[0] = THEME_ON;
