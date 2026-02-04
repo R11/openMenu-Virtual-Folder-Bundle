@@ -1114,13 +1114,13 @@ draw_menu_tr(void) {
         uint32_t dcnow_color = (current_choice == CHOICE_DCNOW ? highlight_color : text_color);
         uint32_t credits_color = (current_choice == CHOICE_CREDITS ? highlight_color : text_color);
         cur_y += line_height;
-        /* Save, Apply, DC Now, Credits across the bottom */
+        /* Save, Apply, DC NOW!, Credits across the bottom */
         font_bmp_set_color(save_color);
         font_bmp_draw_main(640 / 2 - (8 * 18), cur_y, save_choice_text[0]);
         font_bmp_set_color(apply_color);
         font_bmp_draw_main(640 / 2 - (8 * 7), cur_y, save_choice_text[1]);
         font_bmp_set_color(dcnow_color);
-        font_bmp_draw_main(640 / 2 + (8 * 1), cur_y, "DC Now");
+        font_bmp_draw_main(640 / 2 + (8 * 1), cur_y, "DC NOW!");
         font_bmp_set_color(credits_color);
         font_bmp_draw_main(640 / 2 + (8 * 11), cur_y, credits_text[0]);
 
@@ -1247,7 +1247,7 @@ draw_menu_tr(void) {
         cur_y += line_height;
         font_bmf_draw_centered(640 / 2 - (width / 2) + 50, cur_y, save_color, save_choice_text[0]);
         font_bmf_draw_centered(640 / 2 - (width / 6), cur_y, apply_color, save_choice_text[1]);
-        font_bmf_draw_centered(640 / 2 + (width / 6), cur_y, dcnow_color, "DC Now");
+        font_bmf_draw_centered(640 / 2 + (width / 6), cur_y, dcnow_color, "DC NOW!");
         font_bmf_draw_centered(640 / 2 + (width / 2) - 50, cur_y, credits_color, credits_text[0]);
 
         /* Add empty line for spacing */
@@ -1931,7 +1931,7 @@ static void dcnow_connection_status_callback(const char* message) {
 
     /* Title in bright cyan */
     font_bmp_set_color(0xFF00DDFF);
-    font_bmp_draw_main(280, 200, "DC Now");
+    font_bmp_draw_main(240, 200, "Dreamcast NOW!");
 
     /* Determine message color based on content */
     uint32_t msg_color = 0xFFFFFFFF;  /* Default: white */
