@@ -2,12 +2,12 @@
 
 ## Overview
 
-This document describes the implementation of the "DC Now" feature for openMenu, which displays active player counts for Dreamcast Live games by fetching data from `dreamcast.online/now`.
+This document describes the implementation of the "DC Now" feature for openMenu, which displays active player counts for Dreamcast NOW! games by fetching data from `dreamcast.online/now`.
 
 ## Feature Description
 
 The DC Now feature adds a popup window that shows:
-- Total active players across all Dreamcast Live games
+- Total active players across all Dreamcast NOW! games
 - List of games with their current player counts
 - Real-time status (online/offline)
 
@@ -416,4 +416,4 @@ This feature follows the same BSD 3-Clause license as openMenu.
 
 - Network architecture designed following KallistiOS best practices
 - UI implementation follows existing openMenu popup patterns
-- Inspired by the Dreamcast Live community's efforts to keep online gaming alive
+- Inspired by the Dreamcast NOW! community's efforts to keep online gaming alive

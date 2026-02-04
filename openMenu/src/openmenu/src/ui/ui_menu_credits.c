@@ -2274,7 +2274,7 @@ draw_dcnow_tr(void) {
         const int max_visible_games = 10;  /* Show at most 10 games at once */
 
         /* Calculate width based on content */
-        int max_line_len = 30;  /* "Dreamcast Live - Online Now" */
+        int max_line_len = 30;  /* "Dreamcast NOW! - Online Now" */
         const int icon_space = 36;  /* Extra space for 28px icon + 8px gap */
 
         /* Check instruction text length */
@@ -2349,9 +2349,9 @@ draw_dcnow_tr(void) {
         /* Title with debug view indicator */
         char title[64];
         if (dcnow_view == DCNOW_VIEW_PLAYERS) {
-            snprintf(title, sizeof(title), "Dreamcast Live - Player List");
+            snprintf(title, sizeof(title), "Dreamcast NOW! - Player List");
         } else {
-            snprintf(title, sizeof(title), "Dreamcast Live - Online Now");
+            snprintf(title, sizeof(title), "Dreamcast NOW! - Online Now");
         }
         int title_x = x + (width / 2) - ((strlen(title) * 8) / 2);
         font_bmp_set_color(0xFF00DDFF);  /* Bright cyan for title */
@@ -2681,9 +2681,9 @@ draw_dcnow_tr(void) {
 
         /* Title with bright cyan color */
         if (dcnow_view == DCNOW_VIEW_PLAYERS) {
-            font_bmf_draw_centered(x + width / 2, cur_y, 0xFF00DDFF, "Dreamcast Live - Player List");
+            font_bmf_draw_centered(x + width / 2, cur_y, 0xFF00DDFF, "Dreamcast NOW! - Player List");
         } else {
-            font_bmf_draw_centered(x + width / 2, cur_y, 0xFF00DDFF, "Dreamcast Live - Online Now");
+            font_bmf_draw_centered(x + width / 2, cur_y, 0xFF00DDFF, "Dreamcast NOW! - Online Now");
         }
         cur_y += title_gap;
 

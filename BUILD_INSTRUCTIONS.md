@@ -1,6 +1,6 @@
 # Building openMenu with DC Now Feature
 
-This document explains how to build openMenu with the fully functional DC Now (Dreamcast Live) network feature.
+This document explains how to build openMenu with the fully functional DC Now (Dreamcast NOW!) network feature.
 
 ## Overview
 

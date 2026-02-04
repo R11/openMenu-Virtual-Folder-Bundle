@@ -2,7 +2,7 @@
 
 ## Summary
 
-The **DC Now (Dreamcast Live)** player status feature is **100% COMPLETE** with full working network functionality. This is NOT a stub implementation - it's production-ready code that makes real HTTP requests to dreamcast.online/now and displays active player counts.
+The **DC Now (Dreamcast NOW!)** player status feature is **100% COMPLETE** with full working network functionality. This is NOT a stub implementation - it's production-ready code that makes real HTTP requests to dreamcast.online/now and displays active player counts.
 
 ## What Was Implemented
 
@@ -344,7 +344,7 @@ For real data fetching, you need:
 
 ## Git Commits
 
-Two commits on branch `claude/dreamcast-live-games-menu-pv3cn`:
+Two commits on branch `claude/dreamcast-now-games-menu`:
 
 1. **acaa119** - Initial DC Now stub implementation with UI integration
 2. **dde9f47** - Complete network implementation with HTTP client and JSON parser

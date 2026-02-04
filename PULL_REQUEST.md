@@ -1,8 +1,8 @@
-# Pull Request: DC Now Feature - Dreamcast Live Player Status
+# Pull Request: DC Now Feature - Dreamcast NOW! Player Status
 
 ## ✅ READY FOR MERGE
 
-**Branch:** `claude/dreamcast-live-games-menu-pv3cn` → `main`
+**Branch:** `claude/dreamcast-now-games-menu` → `main`
 **Status:** All commits pushed, code verified against ClassiCube
 **Confidence:** 85% (based on proven production code)
 
