@@ -133,7 +133,7 @@ static const uint8_t font_3x5_data[][5] = {
     /* '7' */ {0x7, 0x1, 0x2, 0x2, 0x2},
     /* '8' */ {0x7, 0x5, 0x7, 0x5, 0x7},
     /* '9' */ {0x7, 0x5, 0x7, 0x1, 0x7},
-    /* 'M' */ {0x5, 0x7, 0x7, 0x5, 0x5},
+    /* 'S' */ {0x7, 0x4, 0x7, 0x1, 0x7},
     /* '+' */ {0x0, 0x2, 0x7, 0x2, 0x0},  /* For overflow indicator */
 };
 
@@ -142,7 +142,7 @@ static const uint8_t font_3x5_data[][5] = {
 static void vmu_draw_char_3x5(int x, int y, char c, int color) {
     int idx = -1;
     if (c >= '0' && c <= '9') idx = c - '0';
-    else if (c == 'M' || c == 'm') idx = 10;
+    else if (c == 'S' || c == 's') idx = 10;
     else if (c == '+') idx = 11;
     else return;  /* Unsupported character */
 
@@ -296,23 +296,25 @@ static void vmu_draw_header(int total_players, bool show_spinner) {
         /* Draw spinner when refreshing (takes precedence over time) */
         vmu_draw_spinner(VMU_WIDTH - 7, 1);
     } else if (last_update_time_ms > 0) {
-        /* Draw "Xm" time indicator showing minutes since last update
+        /* Draw "XXs" time indicator showing seconds since last update
+         * in 10-second increments (0s, 10s, 20s, 30s, 40s, 50s)
          * Position: right-aligned in header, using tiny 3x5 font
          * Vertically centered in header: (8 - 5) / 2 = 1.5 → y=1 */
         uint64_t now_ms = timer_ms_gettime64();
         uint64_t elapsed_ms = now_ms - last_update_time_ms;
-        int minutes = (int)(elapsed_ms / 60000);
+        int seconds = (int)(elapsed_ms / 1000);
+        int tens = (seconds / 10) * 10;  /* Round down to nearest 10 */
 
         char time_str[8];
-        if (minutes >= 99) {
-            snprintf(time_str, sizeof(time_str), "+99");  /* Overflow: 99+ minutes */
+        if (tens >= 90) {
+            snprintf(time_str, sizeof(time_str), "+90");  /* Cap at 90s */
         } else {
-            snprintf(time_str, sizeof(time_str), "%dm", minutes);
+            snprintf(time_str, sizeof(time_str), "%ds", tens);
         }
 
         /* Calculate position: right-align with 1px margin
          * Each 3x5 char is 4 pixels (3 + 1 spacing), last char no trailing space
-         * "Xm" = 2 chars = 7 pixels, "XXm" = 3 chars = 11 pixels */
+         * "0s" = 2 chars = 7 pixels, "50s" = 3 chars = 11 pixels */
         int time_len = strlen(time_str);
         int time_width = (time_len * 4) - 1;  /* No trailing space on last char */
         int time_x = VMU_WIDTH - time_width - 1;  /* 1px right margin */
