@@ -33,4 +33,18 @@ bool dcnow_vmu_is_active(void);
  */
 void dcnow_vmu_show_refreshing(void);
 
+/**
+ * Tick the VMU scroll animation.
+ * Call this every frame to advance the scrolling game list.
+ * The scroll moves 1 pixel every 3 frames for legibility.
+ * Only takes effect if DC Now VMU display is currently active.
+ */
+void dcnow_vmu_tick_scroll(void);
+
+/**
+ * Reset the scroll position to the top of the list.
+ * Useful when returning to the DC Now screen or after data refresh.
+ */
+void dcnow_vmu_reset_scroll(void);
+
 #endif /* DCNOW_VMU_H */
