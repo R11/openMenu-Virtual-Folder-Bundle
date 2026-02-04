@@ -2317,7 +2317,7 @@ draw_dcnow_tr(void) {
         const int icon_space = 36;  /* Extra space for 28px icon + 8px gap */
 
         /* Check instruction text length - account for all buttons: A=Fetch Y=Disconnect X=Refresh B=Close */
-        const char* instructions = "A=Fetch Y=Disconnect X=Refresh B=Close";
+        const char* instructions = "A=Fetch  Y=Disconnect  X=Refresh  B=Close";
         int instr_len = strlen(instructions) + 4;  /* Extra margin for colored buttons */
         if (instr_len > max_line_len) {
             max_line_len = instr_len;
@@ -2627,15 +2627,15 @@ draw_dcnow_tr(void) {
             font_bmp_draw_main(instr_x, cur_y, "A");
             instr_x += 8;
             font_bmp_set_color(0xFFCCCCCC);
-            font_bmp_draw_main(instr_x, cur_y, "=Fetch ");
-            instr_x += 7 * 8;
+            font_bmp_draw_main(instr_x, cur_y, "=Fetch");
+            instr_x += 6 * 8 + 16;  /* text + 16px gap */
             /* Y button - GREEN */
             font_bmp_set_color(0xFF00DD00);
             font_bmp_draw_main(instr_x, cur_y, "Y");
             instr_x += 8;
             font_bmp_set_color(0xFFCCCCCC);
-            font_bmp_draw_main(instr_x, cur_y, "=Disconnect ");
-            instr_x += 12 * 8;
+            font_bmp_draw_main(instr_x, cur_y, "=Disconnect");
+            instr_x += 11 * 8 + 16;  /* text + 16px gap */
             /* B button - BLUE */
             font_bmp_set_color(0xFF3399FF);
             font_bmp_draw_main(instr_x, cur_y, "B");
@@ -2648,22 +2648,22 @@ draw_dcnow_tr(void) {
             font_bmp_draw_main(instr_x, cur_y, "A");
             instr_x += 8;
             font_bmp_set_color(0xFFCCCCCC);
-            font_bmp_draw_main(instr_x, cur_y, "=Details ");
-            instr_x += 9 * 8;
+            font_bmp_draw_main(instr_x, cur_y, "=Details");
+            instr_x += 8 * 8 + 16;  /* text + 16px gap */
             /* X button - YELLOW */
             font_bmp_set_color(0xFFFFCC00);
             font_bmp_draw_main(instr_x, cur_y, "X");
             instr_x += 8;
             font_bmp_set_color(0xFFCCCCCC);
-            font_bmp_draw_main(instr_x, cur_y, "=Refresh ");
-            instr_x += 9 * 8;
+            font_bmp_draw_main(instr_x, cur_y, "=Refresh");
+            instr_x += 8 * 8 + 16;  /* text + 16px gap */
             /* Y button - GREEN */
             font_bmp_set_color(0xFF00DD00);
             font_bmp_draw_main(instr_x, cur_y, "Y");
             instr_x += 8;
             font_bmp_set_color(0xFFCCCCCC);
-            font_bmp_draw_main(instr_x, cur_y, "=Disconnect ");
-            instr_x += 12 * 8;
+            font_bmp_draw_main(instr_x, cur_y, "=Disconnect");
+            instr_x += 11 * 8 + 16;  /* text + 16px gap */
             /* B button - BLUE */
             font_bmp_set_color(0xFF3399FF);
             font_bmp_draw_main(instr_x, cur_y, "B");
@@ -2686,7 +2686,7 @@ draw_dcnow_tr(void) {
 
         /* Check instruction text length (vector font is ~10 pixels per char) */
         /* Account for all buttons: A=Fetch Y=Disconnect X=Refresh B=Close */
-        const char* instructions = "A=Fetch Y=Disconnect X=Refresh B=Close";
+        const char* instructions = "A=Fetch  Y=Disconnect  X=Refresh  B=Close";
         int instr_len = strlen(instructions) + 4;  /* Extra margin for colored buttons */
         if (instr_len > max_line_len) {
             max_line_len = instr_len;
@@ -2965,13 +2965,13 @@ draw_dcnow_tr(void) {
             /* A button - RED */
             font_bmf_draw(instr_x, cur_y, 0xFFDD2222, "A");
             instr_x += 12;
-            font_bmf_draw(instr_x, cur_y, 0xFFCCCCCC, "=Fetch ");
-            instr_x += 70;
+            font_bmf_draw(instr_x, cur_y, 0xFFCCCCCC, "=Fetch");
+            instr_x += 60 + 20;  /* text + 20px gap */
             /* Y button - GREEN */
             font_bmf_draw(instr_x, cur_y, 0xFF00DD00, "Y");
             instr_x += 12;
-            font_bmf_draw(instr_x, cur_y, 0xFFCCCCCC, "=Disconnect ");
-            instr_x += 120;
+            font_bmf_draw(instr_x, cur_y, 0xFFCCCCCC, "=Disconnect");
+            instr_x += 110 + 20;  /* text + 20px gap */
             /* B button - BLUE */
             font_bmf_draw(instr_x, cur_y, 0xFF3399FF, "B");
             instr_x += 12;
@@ -2980,18 +2980,18 @@ draw_dcnow_tr(void) {
             /* A button - RED */
             font_bmf_draw(instr_x, cur_y, 0xFFDD2222, "A");
             instr_x += 12;
-            font_bmf_draw(instr_x, cur_y, 0xFFCCCCCC, "=Details ");
-            instr_x += 90;
+            font_bmf_draw(instr_x, cur_y, 0xFFCCCCCC, "=Details");
+            instr_x += 80 + 20;  /* text + 20px gap */
             /* X button - YELLOW */
             font_bmf_draw(instr_x, cur_y, 0xFFFFCC00, "X");
             instr_x += 12;
-            font_bmf_draw(instr_x, cur_y, 0xFFCCCCCC, "=Refresh ");
-            instr_x += 90;
+            font_bmf_draw(instr_x, cur_y, 0xFFCCCCCC, "=Refresh");
+            instr_x += 80 + 20;  /* text + 20px gap */
             /* Y button - GREEN */
             font_bmf_draw(instr_x, cur_y, 0xFF00DD00, "Y");
             instr_x += 12;
-            font_bmf_draw(instr_x, cur_y, 0xFFCCCCCC, "=Disconnect ");
-            instr_x += 120;
+            font_bmf_draw(instr_x, cur_y, 0xFFCCCCCC, "=Disconnect");
+            instr_x += 110 + 20;  /* text + 20px gap */
             /* B button - BLUE */
             font_bmf_draw(instr_x, cur_y, 0xFF3399FF, "B");
             instr_x += 12;
