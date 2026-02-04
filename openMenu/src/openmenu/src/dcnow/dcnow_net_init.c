@@ -142,16 +142,14 @@ void dcnow_net_disconnect(void) {
         printf("DC Now: Shutting down PPP connection...\n");
         ppp_shutdown();
 
-        /* Give PPP time to fully shut down */
-        timer_spin_sleep(800);
+        /* Give PPP time to shut down (reduced from 800ms) */
+        timer_spin_sleep(200);
 
         printf("DC Now: Shutting down modem hardware...\n");
         modem_shutdown();
 
-        /* CRITICAL: Give modem hardware EXTRA time to fully reset */
-        /* Without sufficient delay, subsequent modem_init() calls may fail */
-        /* and arch_exec/reset may leave hardware in bad state causing black screen */
-        timer_spin_sleep(2500);
+        /* Give modem hardware time to reset (reduced from 2500ms) */
+        timer_spin_sleep(500);
 
         printf("DC Now: Modem and PPP disconnected\n");
 
