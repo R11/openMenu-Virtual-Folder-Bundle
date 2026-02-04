@@ -20,6 +20,7 @@ uint8_t* sf_disc_details;
 uint8_t* sf_clock;
 uint8_t* sf_vm2_send_all;
 uint8_t* sf_boot_mode;
+uint8_t* sf_dcnow_vmu;
 
 void
 settings_sanitize() {
@@ -105,5 +106,9 @@ settings_sanitize() {
 
     if ((sf_boot_mode[0] < BOOT_MODE_START) || (sf_boot_mode[0] > BOOT_MODE_END)) {
         sf_boot_mode[0] = BOOT_MODE_FULL;
+    }
+
+    if ((sf_dcnow_vmu[0] < DCNOW_VMU_START) || (sf_dcnow_vmu[0] > DCNOW_VMU_END)) {
+        sf_dcnow_vmu[0] = DCNOW_VMU_ON;
     }
 }
