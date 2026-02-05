@@ -297,25 +297,24 @@ static void vmu_draw_header(int total_players, bool show_spinner) {
         /* Draw spinner when refreshing (takes precedence over time) */
         vmu_draw_spinner(VMU_WIDTH - 7, 1);
     } else if (last_update_time_ms > 0) {
-        /* Draw "XXs" time indicator showing seconds since last update
-         * in 10-second increments (0s, 10s, 20s, 30s, 40s, 50s)
+        /* Draw countdown timer showing seconds until next auto-refresh
+         * Counts down from 60 to 0, then refresh happens and resets
          * Position: right-aligned in header, using tiny 3x5 font
          * Vertically centered in header: (8 - 5) / 2 = 1.5 → y=1 */
         uint64_t now_ms = timer_ms_gettime64();
         uint64_t elapsed_ms = now_ms - last_update_time_ms;
-        int seconds = (int)(elapsed_ms / 1000);
-        int tens = (seconds / 10) * 10;  /* Round down to nearest 10 */
+        int elapsed_seconds = (int)(elapsed_ms / 1000);
+        int remaining = 60 - elapsed_seconds;
+
+        /* Clamp to 0-60 range */
+        if (remaining < 0) remaining = 0;
+        if (remaining > 60) remaining = 60;
 
         char time_str[8];
-        if (tens >= 90) {
-            snprintf(time_str, sizeof(time_str), "+90");  /* Cap at 90s */
-        } else {
-            snprintf(time_str, sizeof(time_str), "%ds", tens);
-        }
+        snprintf(time_str, sizeof(time_str), "%d", remaining);
 
         /* Calculate position: right-align with 1px margin
-         * Each 3x5 char is 4 pixels (3 + 1 spacing), last char no trailing space
-         * "0s" = 2 chars = 7 pixels, "50s" = 3 chars = 11 pixels */
+         * Each 3x5 char is 4 pixels (3 + 1 spacing), last char no trailing space */
         int time_len = strlen(time_str);
         int time_width = (time_len * 4) - 1;  /* No trailing space on last char */
         int time_x = VMU_WIDTH - time_width - 1;  /* 1px right margin */
