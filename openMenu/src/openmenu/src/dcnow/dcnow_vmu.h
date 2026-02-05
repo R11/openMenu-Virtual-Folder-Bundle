@@ -42,6 +42,14 @@ void dcnow_vmu_show_refreshing(void);
 void dcnow_vmu_tick_scroll(void);
 
 /**
+ * Show connection status message on VMU display.
+ * Used during network connection to show progress (Dialing, Connecting, etc.)
+ *
+ * @param status Short status message to display (e.g., "DIALING", "CONNECTING")
+ */
+void dcnow_vmu_show_status(const char* status);
+
+/**
  * Reset the scroll position to the top of the list.
  * Useful when returning to the DC Now screen or after data refresh.
  */

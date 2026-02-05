@@ -3286,8 +3286,10 @@ draw_dcnow_tr(void) {
                 memcpy(&dcnow_data, &dcnow_worker_ctx.result_data, sizeof(dcnow_data));
             }
             dcnow_is_loading = false;
+        } else {
+            /* Still fetching - update VMU with status */
+            dcnow_vmu_show_status("LOADING");
         }
-        /* else: still fetching, UI keeps animating */
     }
 
     /* Start connection worker (after showing connecting message) */
@@ -3333,8 +3335,10 @@ draw_dcnow_tr(void) {
             dcnow_data.data_valid = false;
             dcnow_is_connecting = false;
             connection_status[0] = '\0';
+        } else {
+            /* Still connecting - update VMU with connection status */
+            dcnow_vmu_show_status(connection_status);
         }
-        /* else: still connecting, UI keeps animating with status updates */
     }
 
     /* Auto-refresh every 60 seconds while the popup is open with valid data */

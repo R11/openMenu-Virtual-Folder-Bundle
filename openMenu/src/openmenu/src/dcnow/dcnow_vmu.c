@@ -541,3 +541,74 @@ void dcnow_vmu_reset_scroll(void) {
     }
 #endif
 }
+
+void dcnow_vmu_show_status(const char* status) {
+#ifdef _arch_dreamcast
+    /* Check if DC Now VMU display is disabled in settings */
+    if (sf_dcnow_vmu[0] == DCNOW_VMU_OFF) {
+        return;
+    }
+
+    if (!status) return;
+
+    /* Clear the bitmap (white background) */
+    memset(dcnow_vmu_bitmap, 0, sizeof(dcnow_vmu_bitmap));
+
+    /* Draw header bar (black background) */
+    for (int y = 0; y < HEADER_HEIGHT; y++) {
+        for (int x = 0; x < VMU_WIDTH; x++) {
+            vmu_set_pixel_raw(x, y, 1);  /* Black background */
+        }
+    }
+
+    /* Draw separator line */
+    for (int x = 0; x < VMU_WIDTH; x++) {
+        vmu_set_pixel_raw(x, SEPARATOR_Y, 1);
+    }
+
+    /* Draw "DCNOW" title in header (white text on black) */
+    vmu_draw_string_header(1, 0, "DCNOW", 0);
+
+    /* Draw spinner in header */
+    vmu_draw_spinner(VMU_WIDTH - 7, 1);
+    dcnow_vmu_refresh_frame = (dcnow_vmu_refresh_frame + 1) % 4;
+
+    /* Draw status message in viewport area (centered vertically) */
+    /* Convert status to uppercase for display */
+    char upper_status[16];
+    int i;
+    for (i = 0; i < 15 && status[i]; i++) {
+        char c = status[i];
+        if (c >= 'a' && c <= 'z') {
+            upper_status[i] = c - 32;  /* Convert to uppercase */
+        } else {
+            upper_status[i] = c;
+        }
+    }
+    upper_status[i] = '\0';
+
+    /* Calculate centered position */
+    int text_len = i;
+    int text_width = text_len * CHAR_WIDTH;
+    int x_pos = (VMU_WIDTH - text_width) / 2;
+    if (x_pos < 0) x_pos = 0;
+
+    /* Draw centered in viewport (Y=16 is roughly center of viewport) */
+    int y_pos = VIEWPORT_TOP + (VIEWPORT_HEIGHT - CHAR_HEIGHT) / 2;
+
+    /* Draw status text (black text on white background) */
+    int cur_x = x_pos;
+    for (int j = 0; upper_status[j]; j++) {
+        vmu_draw_char_5x7(cur_x, y_pos, upper_status[j], 1, false);
+        cur_x += CHAR_WIDTH;
+    }
+
+    /* Send to VMU */
+    uint8_t vmu_screens = crayon_peripheral_dreamcast_get_screens();
+    crayon_peripheral_vmu_display_icon(vmu_screens, dcnow_vmu_bitmap);
+
+    dcnow_vmu_active = true;
+#else
+    (void)status;
+#endif
+}
