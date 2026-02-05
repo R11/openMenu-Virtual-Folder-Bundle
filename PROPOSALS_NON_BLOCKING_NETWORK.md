@@ -11,6 +11,53 @@ This document outlines several approaches to make network connections non-blocki
 
 ---
 
+## Current Implementation Analysis
+
+### Blocking Call Locations
+
+| File | Line | Function | What Blocks | Duration |
+|------|------|----------|-------------|----------|
+| `dcnow_net_init.c` | 67 | `modem_init()` | Modem hardware init | ~1s |
+| `dcnow_net_init.c` | 85 | `ppp_modem_init()` | Dialing modem | ~5-10s |
+| `dcnow_net_init.c` | 101 | `ppp_connect()` | PPP handshake | ~10-20s |
+| `dcnow_api.c` | 172 | `gethostbyname()` | DNS resolution | ~1-5s |
+| `dcnow_api.c` | 192 | `connect()` | TCP handshake | ~1-3s |
+| `dcnow_api.c` | 234 | `recv()` loop | HTTP response | ~1-5s |
+
+### Current "Deferred Execution" Pattern
+
+The current code in `ui_menu_credits.c` uses a flag-based pattern:
+
+```c
+// ui_menu_credits.c:2016-2017 - User presses A button
+dcnow_is_connecting = true;
+dcnow_needs_connect = true;  // Set flag, return immediately
+
+// ui_menu_credits.c:2216-2222 - Next draw call checks flag
+if (dcnow_needs_connect && dcnow_shown_connecting) {
+    dcnow_needs_connect = false;
+    dcnow_set_status_callback(dcnow_connection_status_callback);
+    int net_result = dcnow_net_early_init();  // <-- BLOCKS HERE for 20-40 seconds
+    // ...
+}
+```
+
+**Limitation**: This pattern ensures the "Connecting..." message is shown BEFORE blocking, but the UI still **freezes completely** during the blocking calls. The status callback (`dcnow_connection_status_callback`) renders frames during the block, but:
+- Input is not processed
+- Animations don't update smoothly
+- User cannot cancel the operation
+
+### What "Non-Blocking" Would Achieve
+
+| Aspect | Current | With Non-Blocking |
+|--------|---------|-------------------|
+| UI during connect | Frozen (status callback renders occasionally) | Fully responsive, 60fps |
+| Cancel operation | Not possible | User can press B to cancel |
+| Progress display | Status messages only | Animated spinner, percentage |
+| Auto-refresh | Blocks UI for ~3s | Background, user unaware |
+
+---
+
 ## Proposal 1: Worker Thread Approach
 
 **Concept**: Use KOS's `thd_create()` to run network operations in a dedicated worker thread while the main thread continues rendering.
