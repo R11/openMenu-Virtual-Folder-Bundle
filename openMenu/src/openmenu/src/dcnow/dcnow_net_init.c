@@ -85,10 +85,8 @@ static int try_serial_coders_cable(void) {
 
     update_status("Checking for serial cable...");
 
-    /*
-     * Don't call scif_init() here - ppp_scif_init() will handle full SCIF setup.
-     * Just configure parameters for AT handshake.
-     */
+    /* Initialize SCIF hardware - required before setting parameters */
+    scif_init();
     scif_set_irq_usage(0);  /* Disable IRQ mode for polling */
     scif_set_parameters(115200, 1);  /* 115200 baud, FIFO enabled */
 
@@ -101,11 +99,13 @@ static int try_serial_coders_cable(void) {
 
     /* Send AT command to check for listening DreamPi */
     update_status("Detecting DreamPi (serial)...");
+    printf("DC Now: Serial - Sending AT command...\n");
     scif_write_string("AT\r\n");
     scif_flush();  /* Ensure data is transmitted */
+    printf("DC Now: Serial - AT sent, waiting for response...\n");
 
     /* Small delay for DreamPi to process and respond */
-    timer_spin_sleep(100);
+    timer_spin_sleep(200);
 
     /* Wait for OK response with timeout */
     memset(buf, 0, sizeof(buf));
@@ -128,7 +128,13 @@ static int try_serial_coders_cable(void) {
     }
 
     if (strstr(buf, "OK") == NULL) {
-        printf("DC Now: Serial - No OK response (got: '%s')\n", buf);
+        printf("DC Now: Serial - No OK response (got %d bytes: '%s')\n", bytes_read, buf);
+        /* Log to file for debugging */
+        FILE* logfile = fopen("/ram/DCNOW_LOG.TXT", "a");
+        if (logfile) {
+            fprintf(logfile, "Serial AT failed - got %d bytes: '%s'\n", bytes_read, buf);
+            fclose(logfile);
+        }
         /* Restore SCIF to default state for KOS debug output */
         scif_set_parameters(57600, 1);
         scif_set_irq_usage(1);  /* Re-enable IRQ mode */
