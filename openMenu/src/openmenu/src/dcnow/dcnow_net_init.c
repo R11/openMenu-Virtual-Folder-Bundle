@@ -119,6 +119,9 @@ static int try_serial_coders_cable(void) {
 
     if (strstr(buf, "OK") == NULL) {
         printf("DC Now: Serial - No OK response (got: '%s')\n", buf);
+        /* Restore SCIF to default state (57600 baud for KOS debug) */
+        scif_set_parameters(57600, 1);
+        timer_spin_sleep(100);
         return -1;  /* No DreamPi detected on serial */
     }
 
@@ -154,6 +157,9 @@ static int try_serial_coders_cable(void) {
 
     if (strstr(buf, "CONNECT") == NULL) {
         printf("DC Now: Serial - No CONNECT response (got: '%s')\n", buf);
+        /* Restore SCIF to default state */
+        scif_set_parameters(57600, 1);
+        timer_spin_sleep(100);
         return -2;  /* Dial failed */
     }
 
@@ -164,6 +170,7 @@ static int try_serial_coders_cable(void) {
     /* Initialize PPP subsystem */
     if (ppp_init() < 0) {
         update_status("PPP init failed!");
+        scif_set_parameters(57600, 1);
         return -3;
     }
 
@@ -174,6 +181,7 @@ static int try_serial_coders_cable(void) {
         printf("DC Now: Serial - ppp_scif_init failed: %d\n", err);
         update_status("PPP serial init failed!");
         ppp_shutdown();
+        scif_set_parameters(57600, 1);
         return -4;
     }
 
@@ -181,6 +189,7 @@ static int try_serial_coders_cable(void) {
     if (ppp_set_login("dream", "dreamcast") < 0) {
         update_status("Login setup failed!");
         ppp_shutdown();
+        scif_set_parameters(57600, 1);
         return -5;
     }
 
@@ -191,6 +200,7 @@ static int try_serial_coders_cable(void) {
         printf("DC Now: Serial - ppp_connect failed: %d\n", err);
         update_status("PPP connection failed!");
         ppp_shutdown();
+        scif_set_parameters(57600, 1);
         return -6;
     }
 
@@ -220,6 +230,9 @@ int dcnow_net_early_init(void) {
         return 0;  /* Serial connection successful */
     }
     printf("DC Now: Serial cable not detected, trying modem...\n");
+
+    /* Give system time to settle after serial detection before modem init */
+    timer_spin_sleep(500);
 
     /* No BBA or serial - try modem initialization (DreamPi dial-up) */
     update_status("Initializing modem...");
