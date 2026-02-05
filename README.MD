@@ -50,7 +50,6 @@ To accommodate the new openMenu, a modified version of [GD MENU Card Manager](ht
   - [Application Settings](#application-settings)
     - [Temporary Folder](#temporary-folder)
 - [openMenu Usage](#openmenu-usage)
-  - [DC Now (Dreamcast NOW!) Player Status](#dc-now-dreamcast-now-player-status) 🆕
   - [VGA and Region Patching](#vga-and-region-patching)
   - [Using Cheats](#using-cheats)
     - [Per-Game Cheat Files](#per-game-cheat-files)
@@ -571,31 +570,6 @@ GD MENU Card Manager uses a temporary folder for operations like decompressing a
 This is useful if a user's system drive has limited space or if a user prefers to use a faster drive for temporary operations.
 
 ## openMenu Usage
-
-### DC Now (Dreamcast NOW!) Player Status
-
-🆕 **NEW FEATURE**: View active player counts for Dreamcast NOW! games in real-time!
-
-Press **L + R triggers together** to open the DC Now popup, which displays:
-- Total active players across all Dreamcast NOW! games
-- Individual game names with their current player counts
-- Real-time status (online/offline) for each game
-
-**Requirements:**
-- Network connectivity via Broadband Adapter (BBA) or DreamPi
-- Internet connection to reach dreamcast.online
-
-**Controls:**
-- **L + R**: Open DC Now popup
-- **Up/Down**: Scroll through game list
-- **START**: Refresh data from server
-- **A or B**: Close popup
-
-The data is automatically cached after the first fetch to reduce network calls. Press START to refresh with the latest player counts.
-
-For technical details, build instructions, and implementation information, see:
-- `BUILD_INSTRUCTIONS.md` - How to build openMenu with DC Now
-- `DCNOW_IMPLEMENTATION.md` - Technical implementation details
 
 ### VGA and Region Patching
 
