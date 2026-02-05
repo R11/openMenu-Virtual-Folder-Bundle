@@ -3242,124 +3242,15 @@ void
 draw_dcnow_tr(void) {
     z_set_cond(205.0f);
 
-    /* Initialize worker on first use */
-    if (!dcnow_worker_initialized) {
-        dcnow_worker_init();
-        dcnow_worker_initialized = true;
-    }
+    /* Worker initialization, polling, and auto-refresh are now handled by
+     * dcnow_background_tick() which runs every frame from the main loop.
+     * This function just handles the popup display. */
 
-    /* Start fetch worker (only after showing loading screen) */
-    if (dcnow_needs_fetch && dcnow_shown_loading) {
-        dcnow_needs_fetch = false;
-        printf("DC Now: Starting async fetch...\n");
-
-        /* Show VMU refresh indicator */
-        dcnow_vmu_show_refreshing();
-
-        /* Start worker thread for non-blocking fetch */
-        int start_result = dcnow_worker_start_fetch(&dcnow_worker_ctx, 5000);
-        if (start_result < 0) {
-            printf("DC Now: Failed to start fetch worker: %d\n", start_result);
-            dcnow_is_loading = false;
-        }
-        /* Worker is now running - poll in subsequent frames */
-    }
-
-    /* Poll fetch worker for completion */
-    if (dcnow_is_loading && !dcnow_needs_fetch) {
-        dcnow_worker_state_t state = dcnow_worker_poll(&dcnow_worker_ctx);
-
-        /* Update status message for UI */
-        strncpy(connection_status, dcnow_worker_get_status(&dcnow_worker_ctx), sizeof(connection_status) - 1);
-
-        if (state == DCNOW_WORKER_DONE) {
-            printf("DC Now: Fetch worker completed successfully\n");
-            memcpy(&dcnow_data, &dcnow_worker_ctx.result_data, sizeof(dcnow_data));
-            dcnow_data_fetched = true;
-            dcnow_vmu_update_display(&dcnow_data);
-            dcnow_last_fetch_ms = timer_ms_gettime64();
-            dcnow_is_loading = false;
-        } else if (state == DCNOW_WORKER_ERROR) {
-            printf("DC Now: Fetch worker failed: %d\n", dcnow_worker_ctx.error_code);
-            /* Copy error message if available */
-            if (dcnow_worker_ctx.result_data.error_message[0] != '\0') {
-                memcpy(&dcnow_data, &dcnow_worker_ctx.result_data, sizeof(dcnow_data));
-            }
-            dcnow_is_loading = false;
-        } else {
-            /* Still fetching - update VMU with status */
-            dcnow_vmu_show_status("LOADING");
-        }
-    }
-
-    /* Start connection worker (after showing connecting message) */
-    if (dcnow_needs_connect && dcnow_shown_connecting) {
-        dcnow_needs_connect = false;
-        printf("DC Now: Starting async connection...\n");
-
-        /* Start worker thread for non-blocking connection */
-        int start_result = dcnow_worker_start_connect(&dcnow_worker_ctx);
-        if (start_result < 0) {
-            printf("DC Now: Failed to start connect worker: %d\n", start_result);
-            memset(&dcnow_data, 0, sizeof(dcnow_data));
-            snprintf(dcnow_data.error_message, sizeof(dcnow_data.error_message),
-                    "Failed to start connection (error %d)", start_result);
-            dcnow_data.data_valid = false;
-            dcnow_is_connecting = false;
-        }
-        /* Worker is now running - poll in subsequent frames */
-    }
-
-    /* Poll connection worker for completion */
-    if (dcnow_is_connecting && !dcnow_needs_connect) {
-        dcnow_worker_state_t state = dcnow_worker_poll(&dcnow_worker_ctx);
-
-        /* Update status message for UI */
-        strncpy(connection_status, dcnow_worker_get_status(&dcnow_worker_ctx), sizeof(connection_status) - 1);
-
-        if (state == DCNOW_WORKER_DONE) {
-            printf("DC Now: Connection worker completed successfully\n");
-            dcnow_net_initialized = true;
-            dcnow_is_connecting = false;
-            connection_status[0] = '\0';
-
-            /* Immediately trigger data fetch */
-            dcnow_needs_fetch = true;
-            dcnow_is_loading = true;
-            dcnow_shown_loading = false;
-        } else if (state == DCNOW_WORKER_ERROR) {
-            printf("DC Now: Connection worker failed: %d\n", dcnow_worker_ctx.error_code);
-            memset(&dcnow_data, 0, sizeof(dcnow_data));
-            snprintf(dcnow_data.error_message, sizeof(dcnow_data.error_message),
-                    "Connection failed (error %d). Press A to retry", dcnow_worker_ctx.error_code);
-            dcnow_data.data_valid = false;
-            dcnow_is_connecting = false;
-            connection_status[0] = '\0';
-        } else {
-            /* Still connecting - update VMU with connection status */
-            dcnow_vmu_show_status(connection_status);
-        }
-    }
-
-    /* Auto-refresh every 60 seconds while the popup is open with valid data */
-    /* Note: Auto-refresh also uses the worker thread for non-blocking operation */
-    if (dcnow_net_initialized && dcnow_data.data_valid && !dcnow_is_loading &&
-        !dcnow_is_connecting && dcnow_last_fetch_ms > 0 && !dcnow_worker_is_busy()) {
-        uint64_t now = timer_ms_gettime64();
-        if ((now - dcnow_last_fetch_ms) >= DCNOW_AUTO_REFRESH_MS) {
-            printf("DC Now: Auto-refresh triggered (async)\n");
-            dcnow_vmu_show_refreshing();
-
-            /* Start async fetch for auto-refresh */
-            int start_result = dcnow_worker_start_fetch(&dcnow_worker_ctx, 5000);
-            if (start_result == 0) {
-                dcnow_is_loading = true;
-                dcnow_shown_loading = true;  /* Skip the "loading" display for auto-refresh */
-            } else {
-                /* Failed to start worker - just update the timestamp to retry later */
-                dcnow_last_fetch_ms = timer_ms_gettime64();
-                dcnow_vmu_update_display(&dcnow_data);  /* Restore VMU display */
-            }
+    /* Update connection_status from worker for display (if connecting/loading) */
+    if (dcnow_is_connecting || dcnow_is_loading) {
+        const char* status = dcnow_worker_get_status(&dcnow_worker_ctx);
+        if (status && status[0]) {
+            strncpy(connection_status, status, sizeof(connection_status) - 1);
         }
     }
 
@@ -4139,38 +4030,124 @@ draw_dcnow_tr(void) {
 }
 
 /* Background auto-refresh for DC Now data (called from main loop)
- * This ensures data is refreshed every 60 seconds even when popup is closed */
+ * This ensures data is refreshed every 60 seconds even when popup is closed
+ * Also handles worker thread polling and auto-connect at startup */
 void
 dcnow_background_tick(void) {
-    /* Only refresh if network is initialized and we have valid data */
-    if (!dcnow_net_initialized || !dcnow_data.data_valid || dcnow_is_loading) {
-        return;
+    static bool auto_connect_attempted = false;
+
+    /* Initialize worker system on first call */
+    if (!dcnow_worker_initialized) {
+        dcnow_worker_init();
+        dcnow_worker_initialized = true;
     }
 
-    /* Check if we have a valid last fetch timestamp */
-    if (dcnow_last_fetch_ms == 0) {
-        return;
+    /* Auto-connect at startup (only try once) OR user-triggered connect */
+    if ((!auto_connect_attempted || dcnow_needs_connect) && !dcnow_net_initialized && !dcnow_is_connecting) {
+        auto_connect_attempted = true;
+        dcnow_needs_connect = false;
+        printf("DC Now: Starting background connection...\n");
+
+        /* Start connection worker */
+        int start_result = dcnow_worker_start_connect(&dcnow_worker_ctx);
+        if (start_result == 0) {
+            dcnow_is_connecting = true;
+            dcnow_shown_connecting = true;  /* Skip popup requirement */
+        } else {
+            printf("DC Now: Failed to start connect: %d\n", start_result);
+            /* Set error for popup display */
+            memset(&dcnow_data, 0, sizeof(dcnow_data));
+            snprintf(dcnow_data.error_message, sizeof(dcnow_data.error_message),
+                    "Connection failed (error %d). Press A to retry", start_result);
+            dcnow_data.data_valid = false;
+        }
     }
 
-    /* Check if 60 seconds have passed since last refresh */
-    uint64_t now = timer_ms_gettime64();
-    if ((now - dcnow_last_fetch_ms) < DCNOW_AUTO_REFRESH_MS) {
-        return;
+    /* User-triggered fetch (from popup) */
+    if (dcnow_needs_fetch && dcnow_net_initialized && !dcnow_is_loading && !dcnow_worker_is_busy()) {
+        dcnow_needs_fetch = false;
+        printf("DC Now: Starting user-triggered fetch...\n");
+        dcnow_vmu_show_refreshing();
+
+        int start_result = dcnow_worker_start_fetch(&dcnow_worker_ctx, 5000);
+        if (start_result == 0) {
+            dcnow_is_loading = true;
+            dcnow_shown_loading = true;
+        }
     }
 
-    /* Time to refresh! */
-    printf("DC Now: Background auto-refresh triggered\n");
-    dcnow_vmu_show_refreshing();
+    /* Poll connection worker (runs even when popup is closed) */
+    if (dcnow_is_connecting) {
+        dcnow_worker_state_t state = dcnow_worker_poll(&dcnow_worker_ctx);
 
-    int result = dcnow_fetch_data(&dcnow_temp_data, 5000);
-    if (result == 0) {
-        memcpy(&dcnow_data, &dcnow_temp_data, sizeof(dcnow_data));
-        dcnow_vmu_update_display(&dcnow_data);
-        printf("DC Now: Background auto-refresh completed successfully\n");
-    } else {
-        /* Fetch failed — keep old data, restore old VMU display */
-        dcnow_vmu_update_display(&dcnow_data);
-        printf("DC Now: Background auto-refresh failed: %d\n", result);
+        /* Update VMU with connection status */
+        const char* status = dcnow_worker_get_status(&dcnow_worker_ctx);
+        if (status && status[0]) {
+            strncpy(connection_status, status, sizeof(connection_status) - 1);
+            dcnow_vmu_show_status(status);
+        }
+
+        if (state == DCNOW_WORKER_DONE) {
+            printf("DC Now: Background connection successful\n");
+            dcnow_net_initialized = true;
+            dcnow_is_connecting = false;
+            connection_status[0] = '\0';
+
+            /* Auto-trigger data fetch */
+            printf("DC Now: Starting background data fetch...\n");
+            int fetch_result = dcnow_worker_start_fetch(&dcnow_worker_ctx, 10000);
+            if (fetch_result == 0) {
+                dcnow_is_loading = true;
+                dcnow_shown_loading = true;
+            }
+        } else if (state == DCNOW_WORKER_ERROR) {
+            printf("DC Now: Background connection failed: %d\n", dcnow_worker_ctx.error_code);
+            dcnow_is_connecting = false;
+            connection_status[0] = '\0';
+            /* Don't set error message - user hasn't opened popup yet */
+        }
     }
-    dcnow_last_fetch_ms = timer_ms_gettime64();
+
+    /* Poll fetch worker (runs even when popup is closed) */
+    if (dcnow_is_loading && !dcnow_is_connecting) {
+        dcnow_worker_state_t state = dcnow_worker_poll(&dcnow_worker_ctx);
+
+        /* Update VMU with loading status */
+        dcnow_vmu_show_status("LOADING");
+
+        if (state == DCNOW_WORKER_DONE) {
+            printf("DC Now: Background fetch successful\n");
+            memcpy(&dcnow_data, &dcnow_worker_ctx.result_data, sizeof(dcnow_data));
+            dcnow_data_fetched = true;
+            dcnow_vmu_update_display(&dcnow_data);
+            dcnow_last_fetch_ms = timer_ms_gettime64();
+            dcnow_is_loading = false;
+        } else if (state == DCNOW_WORKER_ERROR) {
+            printf("DC Now: Background fetch failed: %d\n", dcnow_worker_ctx.error_code);
+            dcnow_is_loading = false;
+            /* Keep any previous data, just update timestamp */
+            dcnow_last_fetch_ms = timer_ms_gettime64();
+        }
+    }
+
+    /* Background auto-refresh every 60 seconds (using worker thread) */
+    if (dcnow_net_initialized && dcnow_data.data_valid && !dcnow_is_loading &&
+        !dcnow_is_connecting && dcnow_last_fetch_ms > 0 && !dcnow_worker_is_busy()) {
+
+        uint64_t now = timer_ms_gettime64();
+        if ((now - dcnow_last_fetch_ms) >= DCNOW_AUTO_REFRESH_MS) {
+            printf("DC Now: Background auto-refresh triggered\n");
+            dcnow_vmu_show_refreshing();
+
+            int start_result = dcnow_worker_start_fetch(&dcnow_worker_ctx, 5000);
+            if (start_result == 0) {
+                dcnow_is_loading = true;
+                dcnow_shown_loading = true;
+            } else {
+                /* Failed to start worker - just update timestamp to retry later */
+                dcnow_last_fetch_ms = timer_ms_gettime64();
+                dcnow_vmu_update_display(&dcnow_data);
+            }
+        }
+    }
 }
