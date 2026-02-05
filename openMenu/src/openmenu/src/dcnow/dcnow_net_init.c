@@ -85,17 +85,29 @@ static int try_serial_coders_cable(void) {
 
     update_status("Checking for serial cable...");
 
-    /* Initialize SCIF at 115200 baud */
-    /* Parameters: baud rate, use FIFO (1 = yes) */
+    /* Initialize SCIF hardware first */
+    scif_init();
+
+    /* Disable IRQ-based SCIF (use polling mode for AT commands) */
+    scif_set_irq_usage(0);
+
+    /* Set baud rate to 115200 */
     scif_set_parameters(115200, 1);
 
     /* Flush any pending data */
-    timer_spin_sleep(100);
+    timer_spin_sleep(200);
     while (scif_read() != -1) { /* drain buffer */ }
+
+    /* Small delay after flush */
+    timer_spin_sleep(100);
 
     /* Send AT command to check for listening DreamPi */
     update_status("Detecting DreamPi (serial)...");
     scif_write_string("AT\r\n");
+    scif_flush();  /* Ensure data is transmitted */
+
+    /* Small delay for DreamPi to process and respond */
+    timer_spin_sleep(100);
 
     /* Wait for OK response with timeout */
     memset(buf, 0, sizeof(buf));
@@ -119,8 +131,9 @@ static int try_serial_coders_cable(void) {
 
     if (strstr(buf, "OK") == NULL) {
         printf("DC Now: Serial - No OK response (got: '%s')\n", buf);
-        /* Restore SCIF to default state (57600 baud for KOS debug) */
+        /* Restore SCIF to default state for KOS debug output */
         scif_set_parameters(57600, 1);
+        scif_set_irq_usage(1);  /* Re-enable IRQ mode */
         timer_spin_sleep(100);
         return -1;  /* No DreamPi detected on serial */
     }
@@ -133,6 +146,10 @@ static int try_serial_coders_cable(void) {
     while (scif_read() != -1) { /* drain buffer */ }
 
     scif_write_string("ATDT\r\n");
+    scif_flush();  /* Ensure data is transmitted */
+
+    /* Small delay for DreamPi to process */
+    timer_spin_sleep(100);
 
     /* Wait for CONNECT response */
     memset(buf, 0, sizeof(buf));
@@ -159,6 +176,7 @@ static int try_serial_coders_cable(void) {
         printf("DC Now: Serial - No CONNECT response (got: '%s')\n", buf);
         /* Restore SCIF to default state */
         scif_set_parameters(57600, 1);
+        scif_set_irq_usage(1);
         timer_spin_sleep(100);
         return -2;  /* Dial failed */
     }
@@ -171,6 +189,7 @@ static int try_serial_coders_cable(void) {
     if (ppp_init() < 0) {
         update_status("PPP init failed!");
         scif_set_parameters(57600, 1);
+        scif_set_irq_usage(1);
         return -3;
     }
 
@@ -182,6 +201,7 @@ static int try_serial_coders_cable(void) {
         update_status("PPP serial init failed!");
         ppp_shutdown();
         scif_set_parameters(57600, 1);
+        scif_set_irq_usage(1);
         return -4;
     }
 
@@ -190,6 +210,7 @@ static int try_serial_coders_cable(void) {
         update_status("Login setup failed!");
         ppp_shutdown();
         scif_set_parameters(57600, 1);
+        scif_set_irq_usage(1);
         return -5;
     }
 
@@ -201,6 +222,7 @@ static int try_serial_coders_cable(void) {
         update_status("PPP connection failed!");
         ppp_shutdown();
         scif_set_parameters(57600, 1);
+        scif_set_irq_usage(1);
         return -6;
     }
 
