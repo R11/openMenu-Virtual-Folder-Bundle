@@ -98,11 +98,10 @@ static int try_serial_coders_cable(void) {
     timer_spin_sleep(100);
 
     /* Send AT command to check for listening DreamPi */
-    update_status("Detecting DreamPi (serial)...");
-    printf("DC Now: Serial - Sending AT command...\n");
+    update_status("Sending AT command...");
     scif_write_string("AT\r\n");
     scif_flush();  /* Ensure data is transmitted */
-    printf("DC Now: Serial - AT sent, waiting for response...\n");
+    update_status("Waiting for OK response...");
 
     /* Small delay for DreamPi to process and respond */
     timer_spin_sleep(200);
@@ -128,13 +127,12 @@ static int try_serial_coders_cable(void) {
     }
 
     if (strstr(buf, "OK") == NULL) {
-        printf("DC Now: Serial - No OK response (got %d bytes: '%s')\n", bytes_read, buf);
-        /* Log to file for debugging */
-        FILE* logfile = fopen("/ram/DCNOW_LOG.TXT", "a");
-        if (logfile) {
-            fprintf(logfile, "Serial AT failed - got %d bytes: '%s'\n", bytes_read, buf);
-            fclose(logfile);
-        }
+        /* Show on screen what we got */
+        char status_msg[80];
+        snprintf(status_msg, sizeof(status_msg), "No OK - got %d bytes: %.20s", bytes_read, buf);
+        update_status(status_msg);
+        /* Extra delay so user can see the message */
+        timer_spin_sleep(2000);
         /* Restore SCIF to default state for KOS debug output */
         scif_set_parameters(57600, 1);
         scif_set_irq_usage(1);  /* Re-enable IRQ mode */
@@ -177,7 +175,11 @@ static int try_serial_coders_cable(void) {
     }
 
     if (strstr(buf, "CONNECT") == NULL) {
-        printf("DC Now: Serial - No CONNECT response (got: '%s')\n", buf);
+        /* Show on screen what we got */
+        char status_msg[80];
+        snprintf(status_msg, sizeof(status_msg), "No CONNECT - got: %.30s", buf);
+        update_status(status_msg);
+        timer_spin_sleep(2000);
         /* Restore SCIF to default state */
         scif_set_parameters(57600, 1);
         scif_set_irq_usage(1);
@@ -204,8 +206,10 @@ static int try_serial_coders_cable(void) {
     update_status("Starting PPP (serial)...");
     int err = ppp_scif_init(115200);  /* Use 115200 baud for PPP */
     if (err < 0) {
-        printf("DC Now: Serial - ppp_scif_init failed: %d\n", err);
-        update_status("PPP serial init failed!");
+        char status_msg[80];
+        snprintf(status_msg, sizeof(status_msg), "ppp_scif_init failed: %d", err);
+        update_status(status_msg);
+        timer_spin_sleep(2000);
         ppp_shutdown();
         scif_set_parameters(57600, 1);
         scif_set_irq_usage(1);
@@ -225,8 +229,10 @@ static int try_serial_coders_cable(void) {
     update_status("Connecting PPP...");
     err = ppp_connect();
     if (err) {
-        printf("DC Now: Serial - ppp_connect failed: %d\n", err);
-        update_status("PPP connection failed!");
+        char status_msg[80];
+        snprintf(status_msg, sizeof(status_msg), "ppp_connect failed: %d", err);
+        update_status(status_msg);
+        timer_spin_sleep(2000);
         ppp_shutdown();
         scif_set_parameters(57600, 1);
         scif_set_irq_usage(1);
