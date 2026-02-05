@@ -1,5 +1,6 @@
 #include "dcnow_api.h"
 #include "dcnow_json.h"
+#include "dcnow_vmu.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -169,6 +170,7 @@ static int http_get_request(const char* hostname, const char* path, char* respon
 
     /* Resolve hostname */
     printf("DC Now: Resolving %s...\n", hostname);
+    dcnow_vmu_show_refreshing();  /* Update spinner before DNS lookup */
     host = gethostbyname(hostname);
     if (!host) {
         printf("DC Now: DNS lookup failed for %s\n", hostname);
@@ -177,6 +179,7 @@ static int http_get_request(const char* hostname, const char* path, char* respon
     }
 
     printf("DC Now: Resolved to %s\n", inet_ntoa(*(struct in_addr*)host->h_addr));
+    dcnow_vmu_show_refreshing();  /* Update spinner after DNS */
 
     /* Setup server address */
     memset(&server_addr, 0, sizeof(server_addr));
@@ -186,6 +189,7 @@ static int http_get_request(const char* hostname, const char* path, char* respon
 
     /* Connect to server */
     printf("DC Now: Connecting...\n");
+    dcnow_vmu_show_refreshing();  /* Update spinner before connect */
     start_time = timer_ms_gettime64();
     timeout_ticks = timeout_ms;
 
@@ -199,6 +203,7 @@ static int http_get_request(const char* hostname, const char* path, char* respon
     }
 
     printf("DC Now: Connected\n");
+    dcnow_vmu_show_refreshing();  /* Update spinner after connect */
 
     /* Build HTTP GET request */
     snprintf(request_buf, sizeof(request_buf),
@@ -224,11 +229,19 @@ static int http_get_request(const char* hostname, const char* path, char* respon
     /* Receive response */
     start_time = timer_ms_gettime64();
     total_received = 0;
+    uint64 last_spinner_update = 0;
 
     while (total_received < buf_size - 1) {
         if (timer_ms_gettime64() - start_time > timeout_ticks) {
             printf("DC Now: Receive timeout\n");
             break;  /* Timeout - but we may have received some data */
+        }
+
+        /* Update spinner animation every 100ms for smooth animation */
+        uint64 now = timer_ms_gettime64();
+        if (now - last_spinner_update >= 100) {
+            dcnow_vmu_show_refreshing();
+            last_spinner_update = now;
         }
 
         int received = recv(sock, response_buf + total_received,
