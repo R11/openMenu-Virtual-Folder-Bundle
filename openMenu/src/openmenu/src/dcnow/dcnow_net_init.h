@@ -15,20 +15,23 @@ typedef void (*dcnow_status_callback_t)(const char* message);
 void dcnow_set_status_callback(dcnow_status_callback_t callback);
 
 /**
- * Initialize network for DreamPi or BBA with automatic modem dialing
+ * Initialize network for DreamPi or BBA with automatic connection
  *
  * Based on ClassiCube's proven implementation approach.
  *
- * This function:
- * - Checks if BBA is already active (net_default_dev exists)
- * - For BBA: Returns immediately (already initialized)
- * - For DreamPi/modem: Automatically dials and establishes PPP connection using:
- *   1. modem_init() - Initialize modem hardware (FIRST!)
- *   2. ppp_init() - Initialize PPP subsystem
- *   3. ppp_modem_init("111-1111", 1, NULL) - Dial DreamPi (~20 seconds)
- *   4. ppp_set_login("dream", "dreamcast") - Set auth credentials
- *   5. ppp_connect() - Establish connection (~20 seconds)
- *   6. Waits up to 40 seconds for link up
+ * This function tries connection methods in order:
+ * 1. BBA - Checks if Broadband Adapter is already active
+ * 2. Serial Coders Cable - Tries serial connection at 115200 baud
+ *    - Sends "AT\r\n" and waits for "OK\r\n" (DreamPi 2 detection)
+ *    - Sends "ATDT\r\n" dial command
+ *    - Waits for "CONNECT 115200\r\n"
+ *    - Waits 5 seconds for DreamPi to start pppd
+ *    - Establishes PPP over SCIF
+ * 3. Modem Dial-up - Falls back to traditional modem connection
+ *    - modem_init() - Initialize modem hardware
+ *    - ppp_modem_init("111-1111", 1, NULL) - Dial DreamPi
+ *    - ppp_set_login("dream", "dreamcast") - Set auth credentials
+ *    - ppp_connect() - Establish PPP connection
  *
  * This should be called early in main() before any network operations
  *
@@ -43,21 +46,22 @@ void dcnow_set_status_callback(dcnow_status_callback_t callback);
 int dcnow_net_early_init(void);
 
 /**
- * Disconnect and reset the network connection (modem/PPP)
+ * Disconnect and reset the network connection (modem/serial/PPP)
  *
  * This function should be called before:
  * - Exiting to BIOS
  * - Launching a game
  * - Launching CodeBreaker
- * - Console reset (ABXY+Start combo)
  *
  * It will properly shutdown the PPP connection and modem hardware
- * with appropriate delays to ensure hardware fully resets.
+ * (if modem was used) with appropriate delays to ensure hardware
+ * fully resets. For serial coders cable connections, only PPP is
+ * shutdown (no modem hardware involved).
  *
  * After shutdown, net_default_dev is set to NULL so subsequent
  * calls to dcnow_net_early_init() will properly reinitialize.
  *
- * Timing: ~1.5 seconds (500ms PPP shutdown + 1000ms modem reset)
+ * Timing: ~200ms for serial, ~700ms for modem
  */
 void dcnow_net_disconnect(void);
 

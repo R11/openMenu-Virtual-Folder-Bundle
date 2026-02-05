@@ -8,8 +8,21 @@
 #include <kos/net.h>
 #include <ppp/ppp.h>
 #include <dc/modem/modem.h>
+#include <dc/scif.h>
 #include <arch/timer.h>
 #include <dc/pvr.h>
+#endif
+
+/* Serial coders cable connection state */
+static int serial_connection_active = 0;
+
+#ifdef _arch_dreamcast
+/* Helper to write a string to SCIF (serial port) */
+static void scif_write_string(const char* str) {
+    while (*str) {
+        scif_write(*str++);
+    }
+}
 #endif
 
 /* Status callback for visual feedback */
@@ -50,6 +63,147 @@ static void update_status(const char* message) {
     }
 }
 
+/**
+ * Try to connect via serial coders cable to DreamPi 2
+ * Uses SCIF at 115200 baud with AT command handshake
+ *
+ * Protocol:
+ * 1. Send "AT\r\n" and wait for "OK\r\n" (DreamPi detection)
+ * 2. Send "ATDT\r\n" (dial command)
+ * 3. Wait for "CONNECT 115200\r\n"
+ * 4. Sleep 5 seconds for DreamPi to start pppd
+ * 5. Initialize PPP over serial
+ *
+ * @return 0 on success, negative on error
+ */
+static int try_serial_coders_cable(void) {
+#ifdef _arch_dreamcast
+    char buf[64];
+    int bytes_read;
+    uint64 start_time;
+    const uint64 TIMEOUT_MS = 2000;  /* 2 second timeout for responses */
+
+    update_status("Checking for serial cable...");
+
+    /* Initialize SCIF at 115200 baud */
+    /* Parameters: baud rate, use FIFO (1 = yes) */
+    scif_set_parameters(115200, 1);
+
+    /* Flush any pending data */
+    timer_spin_sleep(100);
+    while (scif_read() != -1) { /* drain buffer */ }
+
+    /* Send AT command to check for listening DreamPi */
+    update_status("Detecting DreamPi (serial)...");
+    scif_write_string("AT\r\n");
+
+    /* Wait for OK response with timeout */
+    memset(buf, 0, sizeof(buf));
+    bytes_read = 0;
+    start_time = timer_ms_gettime64();
+
+    while ((timer_ms_gettime64() - start_time) < TIMEOUT_MS) {
+        int c = scif_read();
+        if (c != -1 && bytes_read < (int)sizeof(buf) - 1) {
+            buf[bytes_read++] = (char)c;
+            buf[bytes_read] = '\0';
+
+            /* Check for OK response */
+            if (strstr(buf, "OK") != NULL) {
+                printf("DC Now: Serial - Got OK response from DreamPi\n");
+                break;
+            }
+        }
+        timer_spin_sleep(10);  /* Small delay to avoid busy loop */
+    }
+
+    if (strstr(buf, "OK") == NULL) {
+        printf("DC Now: Serial - No OK response (got: '%s')\n", buf);
+        return -1;  /* No DreamPi detected on serial */
+    }
+
+    /* DreamPi detected! Send dial command */
+    update_status("DreamPi found! Dialing...");
+    timer_spin_sleep(100);  /* Small delay before dial */
+
+    /* Flush buffer before dial */
+    while (scif_read() != -1) { /* drain buffer */ }
+
+    scif_write_string("ATDT\r\n");
+
+    /* Wait for CONNECT response */
+    memset(buf, 0, sizeof(buf));
+    bytes_read = 0;
+    start_time = timer_ms_gettime64();
+    const uint64 CONNECT_TIMEOUT_MS = 5000;  /* 5 second timeout for CONNECT */
+
+    while ((timer_ms_gettime64() - start_time) < CONNECT_TIMEOUT_MS) {
+        int c = scif_read();
+        if (c != -1 && bytes_read < (int)sizeof(buf) - 1) {
+            buf[bytes_read++] = (char)c;
+            buf[bytes_read] = '\0';
+
+            /* Check for CONNECT response */
+            if (strstr(buf, "CONNECT") != NULL) {
+                printf("DC Now: Serial - Got CONNECT response\n");
+                break;
+            }
+        }
+        timer_spin_sleep(10);
+    }
+
+    if (strstr(buf, "CONNECT") == NULL) {
+        printf("DC Now: Serial - No CONNECT response (got: '%s')\n", buf);
+        return -2;  /* Dial failed */
+    }
+
+    /* Connection established - wait for DreamPi to start pppd */
+    update_status("Connected! Waiting for PPP...");
+    timer_spin_sleep(5000);  /* 5 second delay as specified */
+
+    /* Initialize PPP subsystem */
+    if (ppp_init() < 0) {
+        update_status("PPP init failed!");
+        return -3;
+    }
+
+    /* Initialize PPP over SCIF (serial) */
+    update_status("Starting PPP (serial)...");
+    int err = ppp_scif_init(115200);  /* Use 115200 baud for PPP */
+    if (err < 0) {
+        printf("DC Now: Serial - ppp_scif_init failed: %d\n", err);
+        update_status("PPP serial init failed!");
+        ppp_shutdown();
+        return -4;
+    }
+
+    /* Set login credentials */
+    if (ppp_set_login("dream", "dreamcast") < 0) {
+        update_status("Login setup failed!");
+        ppp_shutdown();
+        return -5;
+    }
+
+    /* Establish PPP connection */
+    update_status("Connecting PPP...");
+    err = ppp_connect();
+    if (err) {
+        printf("DC Now: Serial - ppp_connect failed: %d\n", err);
+        update_status("PPP connection failed!");
+        ppp_shutdown();
+        return -6;
+    }
+
+    update_status("Connected via serial!");
+    serial_connection_active = 1;
+    printf("DC Now: Serial coders cable connection established!\n");
+    return 0;
+
+#else
+    return -1;
+#endif
+}
+
 int dcnow_net_early_init(void) {
 #ifdef _arch_dreamcast
     update_status("Initializing network...");
@@ -60,7 +214,14 @@ int dcnow_net_early_init(void) {
         return 0;  /* BBA already active, we're done */
     }
 
-    /* No BBA detected - try modem initialization (DreamPi dial-up) */
+    /* Try serial coders cable first (faster than modem dial-up) */
+    int serial_result = try_serial_coders_cable();
+    if (serial_result == 0) {
+        return 0;  /* Serial connection successful */
+    }
+    printf("DC Now: Serial cable not detected, trying modem...\n");
+
+    /* No BBA or serial - try modem initialization (DreamPi dial-up) */
     update_status("Initializing modem...");
 
     /* Initialize modem hardware */
@@ -137,26 +298,37 @@ void dcnow_net_disconnect(void) {
         return;
     }
 
-    /* Check if it's a PPP connection (modem) */
+    /* Check if it's a PPP connection (modem or serial) */
     if (strncmp(net_default_dev->name, "ppp", 3) == 0) {
         printf("DC Now: Shutting down PPP connection...\n");
         ppp_shutdown();
 
-        /* Give PPP time to shut down (reduced from 800ms) */
+        /* Give PPP time to shut down */
         timer_spin_sleep(200);
 
-        printf("DC Now: Shutting down modem hardware...\n");
-        modem_shutdown();
+        if (serial_connection_active) {
+            /* Serial coders cable - no modem hardware to shutdown */
+            printf("DC Now: Serial PPP disconnected\n");
+            logfile = fopen("/ram/DCNOW_LOG.TXT", "a");
+            if (logfile) {
+                fprintf(logfile, "Serial PPP disconnected successfully\n");
+                fclose(logfile);
+            }
+            serial_connection_active = 0;
+        } else {
+            /* Modem connection - shutdown modem hardware */
+            printf("DC Now: Shutting down modem hardware...\n");
+            modem_shutdown();
 
-        /* Give modem hardware time to reset (reduced from 2500ms) */
-        timer_spin_sleep(500);
+            /* Give modem hardware time to reset */
+            timer_spin_sleep(500);
 
-        printf("DC Now: Modem and PPP disconnected\n");
-
-        logfile = fopen("/ram/DCNOW_LOG.TXT", "a");
-        if (logfile) {
-            fprintf(logfile, "PPP and modem disconnected successfully\n");
-            fclose(logfile);
+            printf("DC Now: Modem and PPP disconnected\n");
+            logfile = fopen("/ram/DCNOW_LOG.TXT", "a");
+            if (logfile) {
+                fprintf(logfile, "PPP and modem disconnected successfully\n");
+                fclose(logfile);
+            }
         }
 
         /* Reset network state to NULL so future init knows to reinitialize */
