@@ -326,20 +326,22 @@ translate_input(void) {
         return DOWN;
     }
 
-    /* Buttons */
-    if (INPT_Button(BTN_A)) {
+    /* Buttons - use edge detection (BTN_PRESS) for A, B, Y, START to prevent
+     * double-press bugs when transitioning between UI states. X keeps hold
+     * detection for grid mode artwork zoom feature. */
+    if (INPT_ButtonEx(BTN_A, BTN_PRESS)) {
         return A;
     }
-    if (INPT_Button(BTN_B)) {
+    if (INPT_ButtonEx(BTN_B, BTN_PRESS)) {
         return B;
     }
     if (INPT_Button(BTN_X)) {
         return X;
     }
-    if (INPT_Button(BTN_Y)) {
+    if (INPT_ButtonEx(BTN_Y, BTN_PRESS)) {
         return Y;
     }
-    if (INPT_Button(BTN_START)) {
+    if (INPT_ButtonEx(BTN_START, BTN_PRESS)) {
         return START;
     }
 
@@ -367,24 +369,24 @@ translate_input(void) {
             return DOWN;
         }
 
-        /* Z or Space → A button */
-        if (INPT_KeyboardButton(KBD_KEY_Z) || INPT_KeyboardButton(KBD_KEY_SPACE)) {
+        /* Z or Space → A button (edge-detected) */
+        if (INPT_KeyboardButtonPress(KBD_KEY_Z) || INPT_KeyboardButtonPress(KBD_KEY_SPACE)) {
             return A;
         }
-        /* X or Escape → B button */
-        if (INPT_KeyboardButton(KBD_KEY_X) || INPT_KeyboardButton(KBD_KEY_ESCAPE)) {
+        /* X or Escape → B button (edge-detected) */
+        if (INPT_KeyboardButtonPress(KBD_KEY_X) || INPT_KeyboardButtonPress(KBD_KEY_ESCAPE)) {
             return B;
         }
-        /* A → X button */
+        /* A → X button (hold-detected for grid artwork zoom) */
         if (INPT_KeyboardButton(KBD_KEY_A)) {
             return X;
         }
-        /* S → Y button */
-        if (INPT_KeyboardButton(KBD_KEY_S)) {
+        /* S → Y button (edge-detected) */
+        if (INPT_KeyboardButtonPress(KBD_KEY_S)) {
             return Y;
         }
-        /* Enter → Start */
-        if (INPT_KeyboardButton(KBD_KEY_ENTER)) {
+        /* Enter → Start (edge-detected) */
+        if (INPT_KeyboardButtonPress(KBD_KEY_ENTER)) {
             return START;
         }
 

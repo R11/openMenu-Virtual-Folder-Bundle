@@ -1,0 +1,66 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="550" d:DesignHeight="350"
+        x:Class="GDMENUCardManager.SerialTranslationDialog"
+        Title="Serial Compatibility Adjustments"
+        SizeToContent="Height"
+        Width="550"
+        MinHeight="200"
+        MaxHeight="500"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Message -->
+        <TextBlock Grid.Row="0" TextWrapping="Wrap" Margin="0,0,0,15">
+            The following serials were adjusted for openMenu compatibility.
+        </TextBlock>
+
+        <TextBlock Grid.Row="1" TextWrapping="Wrap" Margin="0,0,0,15">
+            Note that openMenu has always performed these serial translations automatically, regardless of user settings. As a result, artwork lookups and the IDs used for virtual VMU devices expect the adjusted versions of these serials.
+        </TextBlock>
+
+        <TextBlock Grid.Row="2" TextWrapping="Wrap" Margin="0,0,0,15">
+            It's highly recommended you allow these serials to also be translated here in GD MENU Card Manager for compatibility with artwork lookups and virtual VMU devices.
+        </TextBlock>
+
+        <!-- Checkbox list -->
+        <Border Grid.Row="3" BorderBrush="Gray" BorderThickness="1" Margin="0,0,0,15" MaxHeight="200">
+            <ScrollViewer>
+                <ItemsControl x:Name="TranslationList" Padding="10">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <CheckBox IsChecked="{Binding IsChecked, Mode=TwoWay}" Margin="0,3">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding OriginalSerial}"/>
+                                    <TextBlock Text=" → "/>
+                                    <TextBlock Text="{Binding TranslatedSerial}" FontWeight="SemiBold"/>
+                                    <TextBlock Text="  "/>
+                                    <TextBlock Text="{Binding GameName}" Foreground="Gray"/>
+                                </StackPanel>
+                            </CheckBox>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Border>
+
+        <!-- Instruction and OK Button -->
+        <Grid Grid.Row="4">
+            <TextBlock TextWrapping="Wrap" FontStyle="Italic" Foreground="Gray" VerticalAlignment="Center">
+                Uncheck any you want to revert to the original serial.
+            </TextBlock>
+            <Button Content="OK" Width="80" HorizontalAlignment="Right"
+                    Padding="10,5" Click="OkButton_Click"/>
+        </Grid>
+    </Grid>
+</Window>

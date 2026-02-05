@@ -173,12 +173,6 @@ draw_draw_sub_image(int x, int y, float width, float height, uint32_t color, voi
         return;
     }
 
-    static int sub_frame = 0;
-    if (sub_frame++ % 60 == 0) {
-        printf("SUBIMG: x=%d y=%d w=%.1f h=%.1f img_w=%lu img_h=%lu\n",
-               x, y, width, height, img->width, img->height);
-    }
-
     /* Upper left */
     const float x1 = round((float)x);
     const float y1 = round((float)y);

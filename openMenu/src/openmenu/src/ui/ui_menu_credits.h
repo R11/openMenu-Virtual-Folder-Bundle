@@ -20,6 +20,7 @@ void menu_setup(enum draw_state* state, struct theme_color* _colors, int* timeou
 void popup_setup(enum draw_state* state, struct theme_color* _colors, int* timeout_ptr, uint32_t title_color);
 void exit_menu_setup(enum draw_state* state, struct theme_color* _colors, int* timeout_ptr, uint32_t title_color, int is_folder);
 void cb_menu_setup(enum draw_state* state, struct theme_color* _colors, int* timeout_ptr, uint32_t title_color);
+void saveload_setup(enum draw_state* state, struct theme_color* _colors, int* timeout_ptr, uint32_t title_color);
 
 void handle_input_menu(enum control input);
 void handle_input_credits(enum control input);
@@ -27,6 +28,7 @@ void handle_input_multidisc(enum control input);
 void handle_input_exit(enum control input);
 void handle_input_codebreaker(enum control input);
 void handle_input_psx_launcher(enum control input);
+void handle_input_saveload(enum control input);
 
 void draw_menu_op(void);
 void draw_menu_tr(void);
@@ -45,6 +47,9 @@ void draw_codebreaker_tr(void);
 
 void draw_psx_launcher_op(void);
 void draw_psx_launcher_tr(void);
+
+void draw_saveload_op(void);
+void draw_saveload_tr(void);
 
 void dcnow_setup(enum draw_state* state, struct theme_color* _colors, int* timeout_ptr, uint32_t title_color);
 void handle_input_dcnow(enum control input);

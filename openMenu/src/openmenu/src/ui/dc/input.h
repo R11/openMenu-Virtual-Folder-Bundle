@@ -96,6 +96,7 @@ uint8_t INPT_TriggerValue(TRIGGER trigger);
 /* Keyboard support */
 bool INPT_KeyboardNone(void);
 bool INPT_KeyboardButton(uint8_t kbtn);
+bool INPT_KeyboardButtonPress(uint8_t kbtn);
 
 /* Input Strings */
 #ifdef _arch_dreamcast

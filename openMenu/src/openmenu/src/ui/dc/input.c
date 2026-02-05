@@ -11,6 +11,7 @@
 #include <string.h>
 
 static inputs _current, _last;
+static uint8_t _last_kbd_buttons[INPT_MAX_KEYBOARD_KEYS];
 
 void
 INPT_ReceiveFromHost(inputs _in) {
@@ -60,6 +61,7 @@ INPT_ReceiveFromHost(inputs _in) {
         _current.kbd_buttons[i] = _in.kbd_buttons[i];
     }
 
+    memcpy(_last_kbd_buttons, _last.kbd_buttons, sizeof(_last_kbd_buttons));
     _last = _in;
 }
 
@@ -167,4 +169,23 @@ INPT_KeyboardButton(uint8_t kbtn) {
         }
     }
     return false;
+}
+
+bool
+INPT_KeyboardButtonPress(uint8_t kbtn) {
+    /* Edge detection: true only on the frame the key is first pressed */
+    bool currently_pressed = false;
+    for (int i = 0; i < INPT_MAX_KEYBOARD_KEYS; i++) {
+        if (_current.kbd_buttons[i] == kbtn) {
+            currently_pressed = true;
+            break;
+        }
+    }
+    if (!currently_pressed) return false;
+    for (int i = 0; i < INPT_MAX_KEYBOARD_KEYS; i++) {
+        if (_last_kbd_buttons[i] == kbtn) {
+            return false;
+        }
+    }
+    return true;
 }

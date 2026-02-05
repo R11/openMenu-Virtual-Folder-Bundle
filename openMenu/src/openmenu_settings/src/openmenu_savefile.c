@@ -32,6 +32,7 @@
 
 static crayon_savefile_details_t savefile_details;
 static bool savefile_was_migrated = false;
+static int8_t startup_device_id = -1;  /* Device we loaded settings from at startup */
 #ifdef _arch_dreamcast
 static uint8_t vmu_screens_bitmap = 0;
 #endif
@@ -208,6 +209,9 @@ savefile_init() {
         crayon_savefile_load_savedata(&savefile_details);
         settings_sanitize();
 
+        /* Remember which device we loaded from at startup */
+        startup_device_id = savefile_details.save_device_id;
+
         /* Only auto-save if migration from older version occurred */
         if (savefile_was_migrated) {
             crayon_savefile_save_savedata(&savefile_details);
@@ -281,4 +285,104 @@ savefile_save() {
 #endif
 
     return result;
+}
+
+/* ===== Save/Load Window Helper Functions ===== */
+
+int8_t
+savefile_get_device_status(int8_t device_id) {
+    return crayon_savefile_save_device_status(&savefile_details, device_id);
+}
+
+uint32_t
+savefile_get_device_version(int8_t device_id) {
+    if (device_id < 0 || device_id >= CRAYON_SF_NUM_SAVE_DEVICES) {
+        return 0;
+    }
+    return savefile_details.savefile_versions[device_id];
+}
+
+void
+savefile_refresh_device_info(void) {
+    crayon_savefile_update_all_device_infos(&savefile_details);
+}
+
+int8_t
+savefile_save_to_device(int8_t device_id) {
+    int8_t old_device = savefile_details.save_device_id;
+
+    if (crayon_savefile_set_device(&savefile_details, device_id) != 0) {
+        savefile_details.save_device_id = old_device;
+        return -1;
+    }
+
+    settings_sanitize();
+    vmu_beep(device_id, 0x000065f0);  /* Turn on beep */
+    int8_t result = crayon_savefile_save_savedata(&savefile_details);
+    vmu_beep(device_id, 0x00000000);  /* Turn off beep */
+
+#if defined(_arch_dreamcast) && OPENMENU_ICONS
+    if (result == 0 && vmu_screens_bitmap != 0) {
+        uint8_t single_device = (1 << device_id) & vmu_screens_bitmap;
+        if (single_device) {
+            crayon_peripheral_vmu_display_icon(single_device, OPENMENU_LCD_SAVE_OK);
+            thd_create(0, vmu_icon_restore_thread, NULL);
+        }
+    }
+#endif
+
+    return result;
+}
+
+int8_t
+savefile_load_from_device(int8_t device_id) {
+    int8_t old_device = savefile_details.save_device_id;
+
+    if (crayon_savefile_set_device(&savefile_details, device_id) != 0) {
+        savefile_details.save_device_id = old_device;
+        return -1;
+    }
+
+    savefile_was_migrated = false;
+    int8_t result = crayon_savefile_load_savedata(&savefile_details);
+
+    if (result == 0) {
+        settings_sanitize();
+    }
+
+    return result;
+}
+
+int8_t
+savefile_get_startup_device_id(void) {
+    return startup_device_id;
+}
+
+void
+savefile_show_success_icon(int8_t device_id) {
+#if defined(_arch_dreamcast) && OPENMENU_ICONS
+    if (vmu_screens_bitmap != 0) {
+        uint8_t single_device = (1 << device_id) & vmu_screens_bitmap;
+        if (single_device) {
+            crayon_peripheral_vmu_display_icon(single_device, OPENMENU_LCD_SAVE_OK);
+            thd_create(0, vmu_icon_restore_thread, NULL);
+        }
+    }
+#else
+    (void)device_id;
+#endif
+}
+
+uint32_t
+savefile_get_save_size_blocks(void) {
+    uint32_t size_bytes = crayon_savefile_get_savefile_size(&savefile_details);
+    /* Convert bytes to 512-byte blocks, rounding up */
+    return (size_bytes + 511) / 512;
+}
+
+uint32_t
+savefile_get_device_free_blocks(int8_t device_id) {
+    uint32_t free_bytes = crayon_savefile_devices_free_space(device_id);
+    /* Convert bytes to 512-byte blocks */
+    return free_bytes / 512;
 }

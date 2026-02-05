@@ -32,6 +32,7 @@
 
 /* External declaration for VM2/VMUPro/USB4Maple detection */
 #include <dc/maple.h>
+#include "vm2/vm2_api.h"
 extern int vm2_device_count;
 extern void vm2_rescan(void);
 
@@ -141,7 +142,7 @@ static const char* clock_choice_text[] = {"On (12-Hour)", "On (24-Hour)", "Off"}
 static const char* vm2_send_all_choice_text[] = {"Send to All", "Send to First", "Off"};
 static const char* boot_mode_choice_text[] = {"Full Boot", "License Only", "Animation Only", "Fast Boot"};
 static const char* dcnow_vmu_choice_text[] = {"On", "Off"};
-static const char* save_choice_text[] = {"Save", "Apply"};
+static const char* save_choice_text[] = {"Save/Load", "Apply"};
 static const char* credits_text[] = {"Credits"};
 
 const char* custom_theme_text[10] = {0};
@@ -1003,16 +1004,21 @@ string_outer_concat(char* out, const char* left, const char* right, int len) {
 }
 
 static void
-draw_popup_menu(int x, int y, int width, int height) {
+draw_popup_menu_ex(int x, int y, int width, int height, int ui_mode) {
     const int border_width = 2;
     draw_draw_quad(x - border_width, y - border_width, width + (2 * border_width), height + (2 * border_width),
                    menu_bkg_border_color);
     draw_draw_quad(x, y, width, height, menu_bkg_color);
 
-    if (sf_ui[0] == UI_SCROLL || sf_ui[0] == UI_FOLDERS) {
+    if (ui_mode == UI_SCROLL || ui_mode == UI_FOLDERS) {
         /* Top header */
         draw_draw_quad(x, y, width, 20, menu_bkg_border_color);
     }
+}
+
+static void
+draw_popup_menu(int x, int y, int width, int height) {
+    draw_popup_menu_ex(x, y, width, height, sf_ui[0]);
 }
 
 void
@@ -1786,6 +1792,1046 @@ draw_psx_launcher_tr(void) {
         font_bmf_draw(x_item, cur_y, psx_launcher_choice == 2 ? highlight_color : text_color, "Close");
     }
 }
+
+#pragma region SaveLoad_Menu
+
+/* ===== Save/Load Settings Window ===== */
+
+/* Save/Load sub-states */
+typedef enum SAVELOAD_STATE {
+    SAVELOAD_BROWSE = 0,    /* Browsing device list */
+    SAVELOAD_CONFIRM,       /* Confirming overwrite */
+    SAVELOAD_BUSY,          /* Operation in progress */
+    SAVELOAD_RESULT         /* Showing result message */
+} SAVELOAD_STATE;
+
+/* Save status for each device */
+typedef enum SAVE_STATUS {
+    SAVE_NONE = 0,          /* No save file, can create */
+    SAVE_CURRENT,           /* Up-to-date save file */
+    SAVE_OLD,               /* Older version, will upgrade */
+    SAVE_INVALID,           /* Corrupt/invalid, must overwrite */
+    SAVE_NO_SPACE,          /* No save, not enough space */
+    SAVE_FUTURE             /* Save from newer program version */
+} SAVE_STATUS;
+
+/* Information about a VMU slot */
+typedef struct vmu_slot_info {
+    int8_t device_id;           /* Crayon device ID (0-7) */
+    int8_t crayon_status;       /* Raw CRAYON_SF_STATUS_* value */
+    SAVE_STATUS save_status;    /* Friendly status enum */
+    int has_device;             /* 1 if device present */
+    char type_name[12];         /* "VMU", "VM2", "VMUPro", "USB4MAPLE", "None" */
+    int is_startup_source;      /* 1 if this is where settings were loaded at boot */
+} vmu_slot_info;
+
+/* Save/Load window state */
+static vmu_slot_info saveload_slots[8];         /* All 8 VMU slots */
+static int saveload_cursor = 0;                 /* Current cursor position in full list */
+static int saveload_selected_device = -1;       /* Index of selected device for actions (-1 = none) */
+static SAVELOAD_STATE saveload_substate = SAVELOAD_BROWSE;
+static const char* saveload_msg_line1 = NULL;
+static const char* saveload_msg_line2 = NULL;
+static int saveload_pending_action = 0;         /* 0 = save, 1 = load (for confirm dialog) */
+static int saveload_confirm_choice = 0;         /* 0 = Yes, 1 = No */
+static int saveload_pending_upgrade = 0;        /* 1 if load will trigger upgrade */
+static int saveload_original_ui_mode = -1;      /* UI mode when window opened (for consistent rendering) */
+
+#define SAVELOAD_ACTION_SAVE 0
+#define SAVELOAD_ACTION_LOAD 1
+#define SAVELOAD_ACTION_CLOSE 2
+
+/* Count number of selectable items (devices with VMU + 3 action buttons) */
+static int saveload_get_selectable_count(void) {
+    int count = 0;
+    for (int i = 0; i < 8; i++) {
+        if (saveload_slots[i].has_device) {
+            count++;
+        }
+    }
+    return count + 3;  /* +3 for Save/Load/Close buttons */
+}
+
+/* Get the device index for a cursor position, or -1 if cursor is on action buttons */
+static int saveload_cursor_to_device_index(int cursor) {
+    int device_count = 0;
+    for (int i = 0; i < 8; i++) {
+        if (saveload_slots[i].has_device) {
+            if (device_count == cursor) {
+                return i;
+            }
+            device_count++;
+        }
+    }
+    return -1;  /* Cursor is on action buttons */
+}
+
+/* Get the action index for a cursor position (0=Save, 1=Load, 2=Close), or -1 if on device */
+static int saveload_cursor_to_action(int cursor) {
+    int device_count = 0;
+    for (int i = 0; i < 8; i++) {
+        if (saveload_slots[i].has_device) {
+            device_count++;
+        }
+    }
+    if (cursor >= device_count) {
+        return cursor - device_count;
+    }
+    return -1;
+}
+
+/* Check if cursor is on a device (vs action button) */
+static int saveload_cursor_on_device(void) {
+    return saveload_cursor_to_device_index(saveload_cursor) >= 0;
+}
+
+/* Scan all VMU slots and update saveload_slots array */
+static void saveload_scan_devices(void) {
+    savefile_refresh_device_info();
+    int8_t startup_dev = savefile_get_startup_device_id();
+
+    for (int8_t i = 0; i < 8; i++) {
+        vmu_slot_info* slot = &saveload_slots[i];
+        slot->device_id = i;
+        slot->is_startup_source = (i == startup_dev);
+
+        int8_t status = savefile_get_device_status(i);
+        slot->crayon_status = status;
+
+        if (status == CRAYON_SF_STATUS_NO_DEVICE) {
+            slot->has_device = 0;
+            slot->save_status = SAVE_NONE;
+            strcpy(slot->type_name, "None");
+        } else {
+            slot->has_device = 1;
+
+            /* Get device type name via maple */
+            int port = i / 2;
+            int unit = (i % 2 == 0) ? 1 : 2;
+            maple_device_t* dev = maple_enum_dev(port, unit);
+            if (dev) {
+                const char* type = get_vmu_type_name(dev);
+                strncpy(slot->type_name, type, sizeof(slot->type_name) - 1);
+                slot->type_name[sizeof(slot->type_name) - 1] = '\0';
+            } else {
+                strcpy(slot->type_name, "VMU");
+            }
+
+            /* Map crayon status to friendly status */
+            switch (status) {
+                case CRAYON_SF_STATUS_NO_SF_ROOM:
+                    slot->save_status = SAVE_NONE;
+                    break;
+                case CRAYON_SF_STATUS_NO_SF_FULL:
+                    slot->save_status = SAVE_NO_SPACE;
+                    break;
+                case CRAYON_SF_STATUS_CURRENT_SF:
+                    slot->save_status = SAVE_CURRENT;
+                    break;
+                case CRAYON_SF_STATUS_OLD_SF_ROOM:
+                case CRAYON_SF_STATUS_OLD_SF_FULL:
+                    slot->save_status = SAVE_OLD;
+                    break;
+                case CRAYON_SF_STATUS_FUTURE_SF:
+                    slot->save_status = SAVE_FUTURE;
+                    break;
+                case CRAYON_SF_STATUS_INVALID_SF:
+                default:
+                    slot->save_status = SAVE_INVALID;
+                    break;
+            }
+        }
+    }
+
+    /* Adjust selected device if it's no longer valid */
+    if (saveload_selected_device >= 0) {
+        int idx = saveload_cursor_to_device_index(saveload_selected_device);
+        if (idx < 0 || !saveload_slots[idx].has_device) {
+            saveload_selected_device = -1;
+        }
+    }
+}
+
+/* Initialize saveload state - called from menu_accept when colors are already set */
+static void saveload_init_state(void) {
+    /* Save current UI mode for consistent rendering until window closes */
+    saveload_original_ui_mode = sf_ui[0];
+
+    /* Reset state */
+    saveload_substate = SAVELOAD_BROWSE;
+    saveload_cursor = 0;
+    saveload_selected_device = -1;
+    saveload_msg_line1 = NULL;
+    saveload_msg_line2 = NULL;
+    saveload_confirm_choice = 0;
+    saveload_pending_action = 0;
+    saveload_pending_upgrade = 0;
+
+    saveload_scan_devices();
+
+    /* Find first selectable device and set cursor there */
+    for (int i = 0; i < 8; i++) {
+        if (saveload_slots[i].has_device) {
+            saveload_cursor = 0;
+            break;
+        }
+    }
+}
+
+/* Apply current menu choices to sf_* settings variables */
+static void saveload_apply_choices_to_settings(void) {
+    sf_ui[0] = choices[CHOICE_THEME];
+    sf_region[0] = choices[CHOICE_REGION];
+    sf_aspect[0] = choices[CHOICE_ASPECT];
+    sf_sort[0] = choices[CHOICE_SORT];
+    sf_filter[0] = choices[CHOICE_FILTER];
+    sf_beep[0] = choices[CHOICE_BEEP];
+    sf_bios_3d[0] = choices[CHOICE_BIOS_3D];
+    sf_multidisc[0] = choices[CHOICE_MULTIDISC];
+    sf_multidisc_grouping[0] = choices[CHOICE_MULTIDISC_GROUPING];
+    sf_scroll_art[0] = choices[CHOICE_SCROLL_ART];
+    sf_scroll_index[0] = choices[CHOICE_SCROLL_INDEX];
+    sf_disc_details[0] = choices[CHOICE_DISC_DETAILS];
+    sf_folders_art[0] = choices[CHOICE_FOLDERS_ART];
+    sf_folders_item_details[0] = choices[CHOICE_FOLDERS_ITEM_DETAILS];
+    sf_marquee_speed[0] = choices[CHOICE_MARQUEE_SPEED];
+    sf_clock[0] = choices[CHOICE_CLOCK];
+    sf_vm2_send_all[0] = choices[CHOICE_VM2_SEND_ALL];
+    sf_boot_mode[0] = choices[CHOICE_BOOT_MODE];
+
+    /* Handle custom theme encoding */
+    if (choices[CHOICE_THEME] != UI_SCROLL && choices[CHOICE_THEME] != UI_FOLDERS && sf_region[0] > REGION_END) {
+        sf_custom_theme[0] = THEME_ON;
+        int num_default_themes = 0;
+        theme_get_default(sf_aspect[0], &num_default_themes);
+        sf_custom_theme_num[0] = sf_region[0] - num_default_themes;
+    } else if ((choices[CHOICE_THEME] == UI_SCROLL || choices[CHOICE_THEME] == UI_FOLDERS) && sf_region[0] > 0) {
+        sf_custom_theme[0] = THEME_ON;
+        sf_custom_theme_num[0] = sf_region[0] - 1;
+    } else {
+        sf_custom_theme[0] = THEME_OFF;
+    }
+}
+
+/* Execute save operation */
+static void saveload_do_save(void) {
+    if (saveload_selected_device < 0) return;
+    int dev_idx = saveload_cursor_to_device_index(saveload_selected_device);
+    if (dev_idx < 0) return;
+
+    vmu_slot_info* slot = &saveload_slots[dev_idx];
+
+    saveload_substate = SAVELOAD_BUSY;
+    saveload_msg_line1 = "Saving...";
+    saveload_msg_line2 = NULL;
+
+    /* Apply current menu choices to settings */
+    saveload_apply_choices_to_settings();
+
+    /* Perform save */
+    int8_t result = savefile_save_to_device(slot->device_id);
+
+    saveload_substate = SAVELOAD_RESULT;
+    if (result == 0) {
+        saveload_msg_line1 = "Settings saved successfully.";
+        saveload_msg_line2 = NULL;
+    } else {
+        /* Check if it was a space issue */
+        uint32_t needed = savefile_get_save_size_blocks();
+        uint32_t available = savefile_get_device_free_blocks(slot->device_id);
+        if (needed > available) {
+            static char space_msg[48];
+            snprintf(space_msg, sizeof(space_msg), "Need %lu blocks, only %lu available.", (unsigned long)needed, (unsigned long)available);
+            saveload_msg_line1 = "Error: Not enough space on VMU.";
+            saveload_msg_line2 = space_msg;
+        } else {
+            saveload_msg_line1 = "Error: Failed to save settings.";
+            saveload_msg_line2 = NULL;
+        }
+    }
+
+    /* Refresh device info */
+    saveload_scan_devices();
+}
+
+/* Execute load operation */
+static void saveload_do_load(void) {
+    if (saveload_selected_device < 0) return;
+    int dev_idx = saveload_cursor_to_device_index(saveload_selected_device);
+    if (dev_idx < 0) return;
+
+    vmu_slot_info* slot = &saveload_slots[dev_idx];
+
+    saveload_substate = SAVELOAD_BUSY;
+    saveload_msg_line1 = "Loading...";
+    saveload_msg_line2 = NULL;
+
+    int was_old = (slot->save_status == SAVE_OLD);
+
+    /* Perform load */
+    int8_t result = savefile_load_from_device(slot->device_id);
+
+    saveload_substate = SAVELOAD_RESULT;
+    if (result == 0) {
+        /* Success */
+        if (was_old) {
+            /* Auto-upgrade: save back to VMU */
+            savefile_save_to_device(slot->device_id);
+            saveload_msg_line1 = "Settings loaded and upgraded.";
+        } else {
+            saveload_msg_line1 = "Settings loaded successfully.";
+        }
+        saveload_msg_line2 = NULL;
+
+        /* Show success icon on the target VMU */
+        savefile_show_success_icon(slot->device_id);
+    } else {
+        if (slot->save_status == SAVE_INVALID) {
+            saveload_msg_line1 = "Error: Save file is corrupt.";
+            saveload_msg_line2 = "Save new settings to replace it.";
+        } else if (slot->save_status == SAVE_FUTURE) {
+            saveload_msg_line1 = "Error: Save from newer version.";
+            saveload_msg_line2 = "Please update openMenu.";
+        } else {
+            saveload_msg_line1 = "Error: Failed to load settings.";
+            saveload_msg_line2 = NULL;
+        }
+    }
+
+    /* Refresh device info */
+    saveload_scan_devices();
+}
+
+/* Close the Save/Load window and return to main UI */
+static void saveload_close_all(int do_reload) {
+    if (do_reload) {
+        /* Apply loaded settings to sort/filter */
+        if (!sf_filter[0]) {
+            switch ((CFG_SORT)sf_sort[0]) {
+                case SORT_NAME: list_set_sort_name(); break;
+                case SORT_DATE: list_set_sort_region(); break;
+                case SORT_PRODUCT: list_set_sort_genre(); break;
+                case SORT_SD_CARD: list_set_sort_default(); break;
+                default:
+                case SORT_DEFAULT: list_set_sort_alphabetical(); break;
+            }
+        } else {
+            list_set_genre_sort((FLAGS_GENRE)sf_filter[0] - 1, sf_sort[0]);
+        }
+
+        extern void reload_ui(void);
+        reload_ui();
+    }
+    *state_ptr = DRAW_UI;
+    *input_timeout_ptr = 3;
+}
+
+void
+saveload_setup(enum draw_state* state, theme_color* _colors, int* timeout_ptr, uint32_t title_color) {
+    common_setup(state, _colors, timeout_ptr);
+    menu_title_color = title_color;
+
+    /* Save current UI mode for consistent rendering until window closes */
+    saveload_original_ui_mode = sf_ui[0];
+
+    /* Reset state */
+    saveload_substate = SAVELOAD_BROWSE;
+    saveload_cursor = 0;
+    saveload_selected_device = -1;
+    saveload_msg_line1 = NULL;
+    saveload_msg_line2 = NULL;
+    saveload_confirm_choice = 0;
+    saveload_pending_action = 0;
+    saveload_pending_upgrade = 0;
+
+    saveload_scan_devices();
+
+    /* Find first selectable device and set cursor there */
+    for (int i = 0; i < 8; i++) {
+        if (saveload_slots[i].has_device) {
+            saveload_cursor = 0;
+            break;
+        }
+    }
+}
+
+
+void
+handle_input_saveload(enum control input) {
+    /* Handle based on sub-state */
+    switch (saveload_substate) {
+        case SAVELOAD_BUSY:
+            /* No input during operation */
+            return;
+
+        case SAVELOAD_RESULT:
+            /* Only A button to continue */
+            if (input == A) {
+                /* Check if this was a successful load - if so, close and reload UI */
+                if (saveload_msg_line1 != NULL &&
+                    (strstr(saveload_msg_line1, "loaded") != NULL)) {
+                    saveload_close_all(1);  /* Close with UI reload */
+                } else if (saveload_msg_line1 != NULL &&
+                           strstr(saveload_msg_line1, "saved") != NULL) {
+                    saveload_close_all(0);  /* Close without reload */
+                } else {
+                    /* Error - return to browse */
+                    saveload_substate = SAVELOAD_BROWSE;
+                    saveload_msg_line1 = NULL;
+                    saveload_msg_line2 = NULL;
+                }
+                *input_timeout_ptr = INPUT_TIMEOUT;
+            }
+            return;
+
+        case SAVELOAD_CONFIRM:
+            /* Confirm dialog */
+            switch (input) {
+                case UP:
+                case DOWN:
+                    if (*input_timeout_ptr > 0) break;
+                    saveload_confirm_choice = !saveload_confirm_choice;
+                    *input_timeout_ptr = INPUT_TIMEOUT;
+                    break;
+                case A:
+                    if (saveload_confirm_choice == 0) {
+                        /* Yes - proceed with action */
+                        if (saveload_pending_action == SAVELOAD_ACTION_SAVE) {
+                            saveload_do_save();
+                        } else {
+                            saveload_do_load();
+                        }
+                    } else {
+                        /* No - cancel and return to browse */
+                        saveload_substate = SAVELOAD_BROWSE;
+                    }
+                    *input_timeout_ptr = INPUT_TIMEOUT;
+                    break;
+                case B:
+                    /* Cancel */
+                    saveload_substate = SAVELOAD_BROWSE;
+                    *input_timeout_ptr = INPUT_TIMEOUT;
+                    break;
+                default:
+                    break;
+            }
+            return;
+
+        case SAVELOAD_BROWSE:
+            /* Normal browsing */
+            break;
+    }
+
+    /* Browse state input handling */
+    int total_selectable = saveload_get_selectable_count();
+    int device_count = total_selectable - 3;
+    int close_idx = device_count + 2;  /* Close button index */
+
+    switch (input) {
+        case UP:
+            if (*input_timeout_ptr > 0) break;
+            if (saveload_cursor > 0) {
+                int new_cursor = saveload_cursor - 1;
+                /* Skip Save/Load buttons if no device selected */
+                if (saveload_selected_device < 0 && new_cursor >= device_count && new_cursor < close_idx) {
+                    new_cursor = device_count - 1;  /* Jump to last device */
+                    if (new_cursor < 0) new_cursor = 0;
+                }
+                saveload_cursor = new_cursor;
+                /* Do NOT auto-select device - user must press A to select */
+            }
+            *input_timeout_ptr = INPUT_TIMEOUT;
+            break;
+
+        case DOWN:
+            if (*input_timeout_ptr > 0) break;
+            if (saveload_cursor < total_selectable - 1) {
+                int new_cursor = saveload_cursor + 1;
+                /* Skip Save/Load buttons if no device selected */
+                if (saveload_selected_device < 0 && new_cursor >= device_count && new_cursor < close_idx) {
+                    new_cursor = close_idx;  /* Jump to Close */
+                }
+                saveload_cursor = new_cursor;
+                /* Do NOT auto-select device - user must press A to select */
+            }
+            *input_timeout_ptr = INPUT_TIMEOUT;
+            break;
+
+        case A: {
+            int action = saveload_cursor_to_action(saveload_cursor);
+            if (action == SAVELOAD_ACTION_CLOSE) {
+                /* Close */
+                *state_ptr = DRAW_MENU;
+                *input_timeout_ptr = 3;
+            } else if (action == SAVELOAD_ACTION_SAVE) {
+                /* Save - check if we need confirmation */
+                if (saveload_selected_device < 0) {
+                    /* No device selected - do nothing */
+                    break;
+                }
+                int dev_idx = saveload_cursor_to_device_index(saveload_selected_device);
+                if (dev_idx >= 0) {
+                    vmu_slot_info* slot = &saveload_slots[dev_idx];
+                    if (slot->save_status == SAVE_CURRENT || slot->save_status == SAVE_OLD ||
+                        slot->save_status == SAVE_INVALID) {
+                        /* Need confirmation to overwrite */
+                        saveload_substate = SAVELOAD_CONFIRM;
+                        saveload_pending_action = SAVELOAD_ACTION_SAVE;
+                        saveload_confirm_choice = 0;
+                        saveload_pending_upgrade = 0;
+                    } else {
+                        /* No existing save - proceed directly */
+                        saveload_do_save();
+                    }
+                }
+            } else if (action == SAVELOAD_ACTION_LOAD) {
+                /* Load - check if we can load and need confirmation */
+                if (saveload_selected_device < 0) {
+                    /* No device selected - do nothing */
+                    break;
+                }
+                int dev_idx = saveload_cursor_to_device_index(saveload_selected_device);
+                if (dev_idx >= 0) {
+                    vmu_slot_info* slot = &saveload_slots[dev_idx];
+                    if (slot->save_status == SAVE_NONE || slot->save_status == SAVE_NO_SPACE) {
+                        /* No save to load */
+                        saveload_substate = SAVELOAD_RESULT;
+                        saveload_msg_line1 = "Error: No save file on this VMU.";
+                        saveload_msg_line2 = NULL;
+                    } else if (slot->save_status == SAVE_FUTURE) {
+                        saveload_substate = SAVELOAD_RESULT;
+                        saveload_msg_line1 = "Error: Save from newer version.";
+                        saveload_msg_line2 = "Please update openMenu.";
+                    } else if (slot->save_status == SAVE_INVALID) {
+                        saveload_substate = SAVELOAD_RESULT;
+                        saveload_msg_line1 = "Error: Save file is corrupt.";
+                        saveload_msg_line2 = "Save new settings to replace it.";
+                    } else if (slot->save_status == SAVE_OLD) {
+                        /* Old save - need confirmation for upgrade */
+                        saveload_substate = SAVELOAD_CONFIRM;
+                        saveload_pending_action = SAVELOAD_ACTION_LOAD;
+                        saveload_confirm_choice = 0;
+                        saveload_pending_upgrade = 1;
+                    } else {
+                        /* Current save - load directly */
+                        saveload_do_load();
+                    }
+                }
+            } else if (saveload_cursor_on_device()) {
+                /* On a device - select it and move to Save button */
+                saveload_selected_device = saveload_cursor;
+                saveload_cursor = device_count;  /* Move to Save button */
+            }
+            *input_timeout_ptr = INPUT_TIMEOUT;
+            break;
+        }
+
+        case B:
+        case START:
+            /* Return to Settings menu */
+            *state_ptr = DRAW_MENU;
+            *input_timeout_ptr = 3;
+            break;
+
+        default:
+            break;
+    }
+}
+
+void
+draw_saveload_op(void) {
+    /* Nothing to draw in opaque pass */
+}
+
+void
+draw_saveload_tr(void) {
+    z_set_cond(205.0f);
+
+    /* Use the UI mode that was active when the window opened, not the current sf_ui[0].
+     * This ensures consistent rendering even if a load operation changes the settings. */
+    int ui_mode = (saveload_original_ui_mode >= 0) ? saveload_original_ui_mode : sf_ui[0];
+
+    if (ui_mode == UI_SCROLL || ui_mode == UI_FOLDERS) {
+        /* Scroll/Folders mode - bitmap font */
+        const int line_height = 24;
+        const int padding = 16;
+
+        /* Calculate height based on content - matching Credits window formula */
+        /* 4 ports * (header + 2 sockets) = 12 lines + 4 action area lines = 16 content lines */
+        int content_lines = 0;
+        for (int p = 0; p < 4; p++) {
+            content_lines++;  /* Port header */
+            content_lines += 2;  /* Two sockets */
+        }
+
+        /* Action area: all states use 4 lines for consistent window height */
+        content_lines += 4;
+
+        const int width = 304;
+        /* Match Credits formula: (content + 1) * line_height + extra padding */
+        const int height = (content_lines + 1) * line_height + (line_height * 13 / 12);
+        const int x = (640 / 2) - (width / 2);
+        const int y = (480 / 2) - (height / 2);
+        const int x_item = x + (padding / 2);
+
+        draw_popup_menu_ex(x, y, width, height, ui_mode);
+
+        int cur_y = y + 2;  /* Match Settings title position */
+        font_bmp_begin_draw();
+        font_bmp_set_color(menu_title_color);
+
+        /* Title - centered */
+        const char* title = "Save and Load Settings";
+        font_bmp_draw_main(x + width / 2 - ((int)strlen(title) * 8 / 2), cur_y, title);
+
+        cur_y += line_height / 2;
+
+        /* Track cursor position for highlighting */
+        int cursor_idx = 0;
+        int device_count = 0;
+
+        /* Count devices first */
+        for (int i = 0; i < 8; i++) {
+            if (saveload_slots[i].has_device) {
+                device_count++;
+            }
+        }
+
+        /* Draw ports and sockets */
+        for (int p = 0; p < 4; p++) {
+            cur_y += line_height;
+            font_bmp_set_color(text_color);
+            char port_label[16];
+            snprintf(port_label, sizeof(port_label), "Port %c", 'A' + p);
+            font_bmp_draw_main(x_item, cur_y, port_label);
+
+            /* Socket 1 */
+            cur_y += line_height;
+            int slot_idx = p * 2;
+            vmu_slot_info* slot = &saveload_slots[slot_idx];
+
+            if (slot->has_device) {
+                /* Determine if this is highlighted or selected */
+                int is_cursor = (saveload_substate == SAVELOAD_BROWSE && cursor_idx == saveload_cursor);
+                int is_selected = (!saveload_cursor_on_device() && cursor_idx == saveload_selected_device);
+
+                if (is_cursor) {
+                    font_bmp_set_color(highlight_color);
+                } else {
+                    font_bmp_set_color(text_color);
+                }
+
+                /* Build status string */
+                char status_str[20];
+                if (slot->is_startup_source && slot->save_status == SAVE_CURRENT) {
+                    strcpy(status_str, "(loaded)");
+                } else {
+                    switch (slot->save_status) {
+                        case SAVE_NONE: strcpy(status_str, "(no save)"); break;
+                        case SAVE_CURRENT: strcpy(status_str, "(saved)"); break;
+                        case SAVE_OLD: {
+                            uint32_t ver = savefile_get_device_version(slot->device_id);
+                            snprintf(status_str, sizeof(status_str), "(old v%lu)", (unsigned long)ver);
+                            break;
+                        }
+                        case SAVE_INVALID: strcpy(status_str, "(invalid)"); break;
+                        case SAVE_NO_SPACE: strcpy(status_str, "(full)"); break;
+                        case SAVE_FUTURE: strcpy(status_str, "(future)"); break;
+                        default: strcpy(status_str, ""); break;
+                    }
+                }
+
+                char line[48];
+                if (is_selected) {
+                    snprintf(line, sizeof(line), "> Socket 1: %s %s", slot->type_name, status_str);
+                } else {
+                    snprintf(line, sizeof(line), "  Socket 1: %s %s", slot->type_name, status_str);
+                }
+                font_bmp_draw_main(x_item, cur_y, line);
+                cursor_idx++;
+            } else {
+                font_bmp_set_color(text_color);
+                font_bmp_draw_main(x_item, cur_y, "  Socket 1: None");
+            }
+
+            /* Socket 2 */
+            cur_y += line_height;
+            slot_idx = p * 2 + 1;
+            slot = &saveload_slots[slot_idx];
+
+            if (slot->has_device) {
+                int is_cursor = (saveload_substate == SAVELOAD_BROWSE && cursor_idx == saveload_cursor);
+                int is_selected = (!saveload_cursor_on_device() && cursor_idx == saveload_selected_device);
+
+                if (is_cursor) {
+                    font_bmp_set_color(highlight_color);
+                } else {
+                    font_bmp_set_color(text_color);
+                }
+
+                char status_str[20];
+                if (slot->is_startup_source && slot->save_status == SAVE_CURRENT) {
+                    strcpy(status_str, "(loaded)");
+                } else {
+                    switch (slot->save_status) {
+                        case SAVE_NONE: strcpy(status_str, "(no save)"); break;
+                        case SAVE_CURRENT: strcpy(status_str, "(saved)"); break;
+                        case SAVE_OLD: {
+                            uint32_t ver = savefile_get_device_version(slot->device_id);
+                            snprintf(status_str, sizeof(status_str), "(old v%lu)", (unsigned long)ver);
+                            break;
+                        }
+                        case SAVE_INVALID: strcpy(status_str, "(invalid)"); break;
+                        case SAVE_NO_SPACE: strcpy(status_str, "(full)"); break;
+                        case SAVE_FUTURE: strcpy(status_str, "(future)"); break;
+                        default: strcpy(status_str, ""); break;
+                    }
+                }
+
+                char line[48];
+                if (is_selected) {
+                    snprintf(line, sizeof(line), "> Socket 2: %s %s", slot->type_name, status_str);
+                } else {
+                    snprintf(line, sizeof(line), "  Socket 2: %s %s", slot->type_name, status_str);
+                }
+                font_bmp_draw_main(x_item, cur_y, line);
+                cursor_idx++;
+            } else {
+                font_bmp_set_color(text_color);
+                font_bmp_draw_main(x_item, cur_y, "  Socket 2: None");
+            }
+        }
+
+        /* Spacing before action area */
+        cur_y += line_height;
+
+        /* Action area - all states use exactly 4 lines for consistent window height */
+        if (saveload_substate == SAVELOAD_BUSY || saveload_substate == SAVELOAD_RESULT) {
+            font_bmp_set_color(text_color);
+
+            /* Line 1: Main message */
+            cur_y += line_height;
+            if (saveload_msg_line1) {
+                font_bmp_draw_main(x_item, cur_y, saveload_msg_line1);
+            }
+
+            if (saveload_msg_line2) {
+                /* With context: msg1 / msg2 / empty / Press A */
+                cur_y += line_height;
+                font_bmp_draw_main(x_item, cur_y, saveload_msg_line2);
+                cur_y += line_height;  /* Empty separator */
+                cur_y += line_height;
+                if (saveload_substate == SAVELOAD_RESULT) {
+                    font_bmp_draw_main(x_item, cur_y, "Press A to continue.");
+                }
+            } else {
+                /* No context: msg1 / empty / Press A / empty */
+                cur_y += line_height;  /* Empty separator */
+                cur_y += line_height;
+                if (saveload_substate == SAVELOAD_RESULT) {
+                    font_bmp_draw_main(x_item, cur_y, "Press A to continue.");
+                }
+                cur_y += line_height;  /* Empty for consistent height */
+            }
+        } else if (saveload_substate == SAVELOAD_CONFIRM) {
+            /* Layout: prompt / Yes / No / empty */
+            font_bmp_set_color(text_color);
+
+            /* Line 1: Prompt message */
+            cur_y += line_height;
+            if (saveload_pending_upgrade) {
+                uint32_t old_ver = 0;
+                if (saveload_selected_device >= 0) {
+                    int dev_idx = saveload_cursor_to_device_index(saveload_selected_device);
+                    if (dev_idx >= 0) {
+                        old_ver = savefile_get_device_version(saveload_slots[dev_idx].device_id);
+                    }
+                }
+                char upgrade_msg[48];
+                snprintf(upgrade_msg, sizeof(upgrade_msg), "Load will upgrade old save (v%lu).", (unsigned long)old_ver);
+                font_bmp_draw_main(x_item, cur_y, upgrade_msg);
+            } else {
+                font_bmp_draw_main(x_item, cur_y, "Overwrite existing save?");
+            }
+
+            /* Line 2: Yes */
+            cur_y += line_height;
+            font_bmp_set_color(saveload_confirm_choice == 0 ? highlight_color : text_color);
+            font_bmp_draw_main(x_item, cur_y, "Yes");
+
+            /* Line 3: No */
+            cur_y += line_height;
+            font_bmp_set_color(saveload_confirm_choice == 1 ? highlight_color : text_color);
+            font_bmp_draw_main(x_item, cur_y, "No");
+
+            /* Line 4: Empty for consistent height */
+            cur_y += line_height;
+        } else {
+            /* BROWSE state - Layout: Save / Load / Close / empty */
+            int action_start_idx = device_count;
+
+            /* Line 1: Save to selected */
+            cur_y += line_height;
+            int is_save_cursor = (saveload_cursor == action_start_idx);
+            int save_disabled = (saveload_selected_device < 0);
+            if (is_save_cursor && !save_disabled) {
+                font_bmp_set_color(highlight_color);
+            } else {
+                font_bmp_set_color(text_color);
+            }
+            font_bmp_draw_main(x_item, cur_y, "Save to selected");
+
+            /* Line 2: Load from selected */
+            cur_y += line_height;
+            int is_load_cursor = (saveload_cursor == action_start_idx + 1);
+            int load_disabled = (saveload_selected_device < 0);
+            if (is_load_cursor && !load_disabled) {
+                font_bmp_set_color(highlight_color);
+            } else {
+                font_bmp_set_color(text_color);
+            }
+            font_bmp_draw_main(x_item, cur_y, "Load from selected");
+
+            /* Line 3: Close */
+            cur_y += line_height;
+            int is_close_cursor = (saveload_cursor == action_start_idx + 2);
+            if (is_close_cursor) {
+                font_bmp_set_color(highlight_color);
+            } else {
+                font_bmp_set_color(text_color);
+            }
+            font_bmp_draw_main(x_item, cur_y, "Close");
+
+            /* Line 4: Empty for consistent height */
+            cur_y += line_height;
+        }
+    } else {
+        /* LineDesc/Grid mode - proportional font */
+        const int line_height = 26;
+        const int padding = 16;
+
+        /* Calculate height based on content */
+        /* 4 ports * (header + 2 sockets) = 12 lines + 4 action area lines = 16 content lines */
+        int content_lines = 0;
+        for (int p = 0; p < 4; p++) {
+            content_lines++;  /* Port header */
+            content_lines += 2;  /* Two sockets */
+        }
+
+        /* Action area: all states use 4 lines for consistent window height */
+        content_lines += 4;
+
+        const int width = 400;
+        const int height = (content_lines + 2) * line_height;
+        const int x = (640 / 2) - (width / 2);
+        const int y = (480 / 2) - (height / 2);
+        const int x_item = x + (padding / 2);
+
+        draw_popup_menu_ex(x, y, width, height, ui_mode);
+
+        int cur_y = y + 2;  /* Match Settings title position */
+        font_bmf_begin_draw();
+        font_bmf_set_height(24.0f);
+
+        /* Title */
+        font_bmf_draw(x_item, cur_y, text_color, "Save and Load Settings");
+
+        cur_y += line_height / 4;
+
+        /* Track cursor position for highlighting */
+        int cursor_idx = 0;
+        int device_count = 0;
+
+        /* Count devices first */
+        for (int i = 0; i < 8; i++) {
+            if (saveload_slots[i].has_device) {
+                device_count++;
+            }
+        }
+
+        /* Draw ports and sockets */
+        for (int p = 0; p < 4; p++) {
+            cur_y += line_height;
+            char port_label[16];
+            snprintf(port_label, sizeof(port_label), "Port %c", 'A' + p);
+            font_bmf_draw(x_item, cur_y, text_color, port_label);
+
+            /* Socket 1 */
+            cur_y += line_height;
+            int slot_idx = p * 2;
+            vmu_slot_info* slot = &saveload_slots[slot_idx];
+
+            if (slot->has_device) {
+                /* Determine if this is highlighted or selected */
+                int is_cursor = (saveload_substate == SAVELOAD_BROWSE && cursor_idx == saveload_cursor);
+                int is_selected = (!saveload_cursor_on_device() && cursor_idx == saveload_selected_device);
+
+                uint32_t slot_color = is_cursor ? highlight_color : text_color;
+
+                /* Build status string */
+                char status_str[20];
+                if (slot->is_startup_source && slot->save_status == SAVE_CURRENT) {
+                    strcpy(status_str, "(loaded)");
+                } else {
+                    switch (slot->save_status) {
+                        case SAVE_NONE: strcpy(status_str, "(no save)"); break;
+                        case SAVE_CURRENT: strcpy(status_str, "(saved)"); break;
+                        case SAVE_OLD: {
+                            uint32_t ver = savefile_get_device_version(slot->device_id);
+                            snprintf(status_str, sizeof(status_str), "(old v%lu)", (unsigned long)ver);
+                            break;
+                        }
+                        case SAVE_INVALID: strcpy(status_str, "(invalid)"); break;
+                        case SAVE_NO_SPACE: strcpy(status_str, "(full)"); break;
+                        case SAVE_FUTURE: strcpy(status_str, "(future)"); break;
+                        default: strcpy(status_str, ""); break;
+                    }
+                }
+
+                char line[48];
+                if (is_selected) {
+                    snprintf(line, sizeof(line), "> Socket 1: %s %s", slot->type_name, status_str);
+                } else {
+                    snprintf(line, sizeof(line), "   Socket 1: %s %s", slot->type_name, status_str);
+                }
+                font_bmf_draw(x_item, cur_y, slot_color, line);
+                cursor_idx++;
+            } else {
+                font_bmf_draw(x_item, cur_y, text_color, "   Socket 1: None");
+            }
+
+            /* Socket 2 */
+            cur_y += line_height;
+            slot_idx = p * 2 + 1;
+            slot = &saveload_slots[slot_idx];
+
+            if (slot->has_device) {
+                int is_cursor = (saveload_substate == SAVELOAD_BROWSE && cursor_idx == saveload_cursor);
+                int is_selected = (!saveload_cursor_on_device() && cursor_idx == saveload_selected_device);
+
+                uint32_t slot_color = is_cursor ? highlight_color : text_color;
+
+                char status_str[20];
+                if (slot->is_startup_source && slot->save_status == SAVE_CURRENT) {
+                    strcpy(status_str, "(loaded)");
+                } else {
+                    switch (slot->save_status) {
+                        case SAVE_NONE: strcpy(status_str, "(no save)"); break;
+                        case SAVE_CURRENT: strcpy(status_str, "(saved)"); break;
+                        case SAVE_OLD: {
+                            uint32_t ver = savefile_get_device_version(slot->device_id);
+                            snprintf(status_str, sizeof(status_str), "(old v%lu)", (unsigned long)ver);
+                            break;
+                        }
+                        case SAVE_INVALID: strcpy(status_str, "(invalid)"); break;
+                        case SAVE_NO_SPACE: strcpy(status_str, "(full)"); break;
+                        case SAVE_FUTURE: strcpy(status_str, "(future)"); break;
+                        default: strcpy(status_str, ""); break;
+                    }
+                }
+
+                char line[48];
+                if (is_selected) {
+                    snprintf(line, sizeof(line), "> Socket 2: %s %s", slot->type_name, status_str);
+                } else {
+                    snprintf(line, sizeof(line), "   Socket 2: %s %s", slot->type_name, status_str);
+                }
+                font_bmf_draw(x_item, cur_y, slot_color, line);
+                cursor_idx++;
+            } else {
+                font_bmf_draw(x_item, cur_y, text_color, "   Socket 2: None");
+            }
+        }
+
+        /* Spacing before action area */
+        cur_y += line_height;
+
+        /* Action area - all states use exactly 4 lines for consistent window height */
+        if (saveload_substate == SAVELOAD_BUSY || saveload_substate == SAVELOAD_RESULT) {
+            /* Line 1: Main message */
+            cur_y += line_height;
+            if (saveload_msg_line1) {
+                font_bmf_draw(x_item, cur_y, text_color, saveload_msg_line1);
+            }
+
+            if (saveload_msg_line2) {
+                /* With context: msg1 / msg2 / empty / Press A */
+                cur_y += line_height;
+                font_bmf_draw(x_item, cur_y, text_color, saveload_msg_line2);
+                cur_y += line_height;  /* Empty separator */
+                cur_y += line_height;
+                if (saveload_substate == SAVELOAD_RESULT) {
+                    font_bmf_draw(x_item, cur_y, text_color, "Press A to continue.");
+                }
+            } else {
+                /* No context: msg1 / empty / Press A / empty */
+                cur_y += line_height;  /* Empty separator */
+                cur_y += line_height;
+                if (saveload_substate == SAVELOAD_RESULT) {
+                    font_bmf_draw(x_item, cur_y, text_color, "Press A to continue.");
+                }
+                cur_y += line_height;  /* Empty for consistent height */
+            }
+        } else if (saveload_substate == SAVELOAD_CONFIRM) {
+            /* Layout: prompt / Yes / No / empty */
+            /* Line 1: Prompt message */
+            cur_y += line_height;
+            if (saveload_pending_upgrade) {
+                uint32_t old_ver = 0;
+                if (saveload_selected_device >= 0) {
+                    int dev_idx = saveload_cursor_to_device_index(saveload_selected_device);
+                    if (dev_idx >= 0) {
+                        old_ver = savefile_get_device_version(saveload_slots[dev_idx].device_id);
+                    }
+                }
+                char upgrade_msg[48];
+                snprintf(upgrade_msg, sizeof(upgrade_msg), "Load will upgrade old save (v%lu).", (unsigned long)old_ver);
+                font_bmf_draw(x_item, cur_y, text_color, upgrade_msg);
+            } else {
+                font_bmf_draw(x_item, cur_y, text_color, "Overwrite existing save?");
+            }
+
+            /* Line 2: Yes */
+            cur_y += line_height;
+            font_bmf_draw(x_item, cur_y, saveload_confirm_choice == 0 ? highlight_color : text_color, "Yes");
+
+            /* Line 3: No */
+            cur_y += line_height;
+            font_bmf_draw(x_item, cur_y, saveload_confirm_choice == 1 ? highlight_color : text_color, "No");
+
+            /* Line 4: Empty for consistent height */
+            cur_y += line_height;
+        } else {
+            /* BROWSE state - Layout: Save / Load / Close / empty */
+            int action_start_idx = device_count;
+
+            /* Line 1: Save to selected */
+            cur_y += line_height;
+            int is_save_cursor = (saveload_cursor == action_start_idx);
+            int save_disabled = (saveload_selected_device < 0);
+            uint32_t save_color = (is_save_cursor && !save_disabled) ? highlight_color : text_color;
+            font_bmf_draw(x_item, cur_y, save_color, "Save to selected");
+
+            /* Line 2: Load from selected */
+            cur_y += line_height;
+            int is_load_cursor = (saveload_cursor == action_start_idx + 1);
+            int load_disabled = (saveload_selected_device < 0);
+            uint32_t load_color = (is_load_cursor && !load_disabled) ? highlight_color : text_color;
+            font_bmf_draw(x_item, cur_y, load_color, "Load from selected");
+
+            /* Line 3: Close */
+            cur_y += line_height;
+            int is_close_cursor = (saveload_cursor == action_start_idx + 2);
+            uint32_t close_color = is_close_cursor ? highlight_color : text_color;
+            font_bmf_draw(x_item, cur_y, close_color, "Close");
+
+            /* Line 4: Empty for consistent height */
+            cur_y += line_height;
+        }
+    }
+}
+
+#pragma endregion SaveLoad_Menu
 
 /*
  * DC Now (dreamcast.online/now) Player Status Popup

@@ -740,6 +740,9 @@ FUNCTION_INPUT(UI_NAME, handle_input) {
         case DRAW_PSX_LAUNCHER: {
             handle_input_psx_launcher(input_current);
         } break;
+        case DRAW_SAVELOAD: {
+            handle_input_saveload(input_current);
+        } break;
         case DRAW_DCNOW_PLAYERS: {
             handle_input_dcnow(input_current);
         } break;
@@ -778,6 +781,10 @@ FUNCTION(UI_NAME, drawOP) {
         case DRAW_PSX_LAUNCHER: {
             /* PSX launcher popup on top */
             draw_psx_launcher_op();
+        } break;
+        case DRAW_SAVELOAD: {
+            /* Save/Load popup on top */
+            draw_saveload_op();
         } break;
         case DRAW_DCNOW_PLAYERS: {
             /* DC Now popup on top */
@@ -819,6 +826,10 @@ FUNCTION(UI_NAME, drawTR) {
         case DRAW_PSX_LAUNCHER: {
             /* PSX launcher popup on top */
             draw_psx_launcher_tr();
+        } break;
+        case DRAW_SAVELOAD: {
+            /* Save/Load popup on top */
+            draw_saveload_tr();
         } break;
         case DRAW_DCNOW_PLAYERS: {
             /* DC Now popup on top */

@@ -46,7 +46,7 @@ send_allinfo(maple_device_t* dev) {
         if (dev->frame.state != MAPLE_FRAME_UNSENT) {
             /* It's probably never coming back, so just unlock the frame */
             dev->frame.state = MAPLE_FRAME_VACANT;
-            /*dbglog(DBG_ERROR, */ printf("send_allinfo: timeout to unit %c%c\n", dev->port + 'A', dev->unit + '0');
+            dbglog(DBG_ERROR, "send_allinfo: timeout to unit %c%c\n", dev->port + 'A', dev->unit + '0');
             return MAPLE_ETIMEOUT;
         }
     }
@@ -130,9 +130,39 @@ check_vm2_present(maple_device_t* dev) {
     maple_alldevinfo_t* info = (maple_alldevinfo_t*)&recv_buff[4];
 
     if (!strncasecmp(info->extended, "VM2 by Dreamware", 16) || !strncasecmp(info->extended, "USB RP2040 EMU  ", 16)
-        || !strncasecmp(info->extended, "8BITMODS VMUPro ", 16)) {
+        || !strncasecmp(info->extended, "8BITMODS VMUPro ", 16) || !strncasecmp(info->extended, "Pico2Maple USBBT", 16)) {
         return 1;
     }
 
     return 0;
+}
+
+const char*
+get_vmu_type_name(maple_device_t* dev) {
+    if (!dev) {
+        return "None";
+    }
+
+    /* Clear the old buffer */
+    memset(recv_buff, 0, 196);
+
+    if (send_allinfo(dev) != MAPLE_EOK) {
+        /* Can't query, assume regular VMU */
+        return "VMU";
+    }
+
+    maple_alldevinfo_t* info = (maple_alldevinfo_t*)&recv_buff[4];
+
+    if (!strncasecmp(info->extended, "VM2 by Dreamware", 16)) {
+        return "VM2";
+    } else if (!strncasecmp(info->extended, "8BITMODS VMUPro ", 16)) {
+        return "VMUPro";
+    } else if (!strncasecmp(info->extended, "USB RP2040 EMU  ", 16)) {
+        return "USB4MAPLE";
+    } else if (!strncasecmp(info->extended, "Pico2Maple USBBT", 16)) {
+        return "Pico2Maple";
+    }
+
+    /* Default: regular VMU */
+    return "VMU";
 }

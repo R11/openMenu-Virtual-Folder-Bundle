@@ -462,7 +462,7 @@ menu_right(void) {
 
 static void
 menu_cb(void) {
-    if ((navigate_timeout > 0) || (list_len <= 0)) {
+    if (list_len <= 0) {
         return;
     }
 
@@ -498,7 +498,7 @@ run_cb(void) {
 
 static void
 menu_accept(void) {
-    if ((navigate_timeout > 0) || (list_len <= 0)) {
+    if (list_len <= 0) {
         return;
     }
 
@@ -524,7 +524,7 @@ menu_accept(void) {
         current_starting_index = 0;
         draw_current = DRAW_UI;
 
-        navigate_timeout = INPUT_TIMEOUT * 2;
+        navigate_timeout = 3;
 
         anim_clear(&anim_highlight);
         anim_clear(&anim_large_art_pos);
@@ -564,9 +564,6 @@ menu_accept(void) {
 
 static void
 menu_settings(void) {
-    if (navigate_timeout > 0) {
-        return;
-    }
 
     draw_current = DRAW_MENU;
     menu_setup(&draw_current, current_theme_colors, &navigate_timeout, current_theme_colors->menu_highlight_color);
@@ -604,9 +601,6 @@ menu_show_large_art(void) {
 
 static void
 menu_exit(void) {
-    if (navigate_timeout > 0) {
-        return;
-    }
 
     set_cur_game_item(list_current[current_selected()]);
     draw_current = DRAW_EXIT;
@@ -749,7 +743,7 @@ FUNCTION(UI_NAME, setup) {
     current_starting_index = 0;
     draw_current = DRAW_UI;
 
-    navigate_timeout = INPUT_TIMEOUT * 2;
+    navigate_timeout = 3;
 
     anim_clear(&anim_highlight);
     anim_clear(&anim_large_art_pos);
@@ -779,6 +773,10 @@ FUNCTION_INPUT(UI_NAME, handle_input) {
         } break;
         case DRAW_PSX_LAUNCHER: {
             handle_input_psx_launcher(input_current);
+        } break;
+
+        case DRAW_SAVELOAD: {
+            handle_input_saveload(input_current);
         } break;
         case DRAW_DCNOW_PLAYERS: {
             handle_input_dcnow(input_current);
@@ -818,6 +816,11 @@ FUNCTION(UI_NAME, drawOP) {
         case DRAW_PSX_LAUNCHER: {
             /* PSX launcher popup on top */
             draw_psx_launcher_op();
+        } break;
+
+        case DRAW_SAVELOAD: {
+            /* Save/Load popup on top */
+            draw_saveload_op();
         } break;
         case DRAW_DCNOW_PLAYERS: {
             /* DC Now popup on top */
@@ -860,6 +863,11 @@ FUNCTION(UI_NAME, drawTR) {
         case DRAW_PSX_LAUNCHER: {
             /* PSX launcher popup on top */
             draw_psx_launcher_tr();
+        } break;
+
+        case DRAW_SAVELOAD: {
+            /* Save/Load popup on top */
+            draw_saveload_tr();
         } break;
         case DRAW_DCNOW_PLAYERS: {
             /* DC Now popup on top */

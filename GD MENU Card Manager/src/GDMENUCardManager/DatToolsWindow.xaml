@@ -1,0 +1,92 @@
+<Window x:Class="GDMENUCardManager.DatToolsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="DAT Tools" SizeToContent="Height" Width="550" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner">
+    <Grid Margin="10">
+        <TabControl>
+            <!-- Import DAT Entries Tab -->
+            <TabItem Header="Import DAT Entries">
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Instructions -->
+                    <TextBlock Grid.Row="0" TextWrapping="Wrap" Margin="0,0,0,15" Foreground="Black" xml:space="preserve"><Run>Import entries to merge into the current DAT files.</Run><LineBreak/><LineBreak/><Run>Before this process is initiated, the DATs that currently reside in the "tools\openMenu\menu_data" will be backed up to the "dat_backups" folder.</Run><LineBreak/><LineBreak/><Run>Use </Run><Run FontWeight="Bold">Choose DAT Folder</Run><Run> to select a folder containing either BOX.DAT or META.DAT (or both), as ICON.DAT will be automatically generated from BOX.DAT.</Run><LineBreak/><LineBreak/><Run>Decide if only entries missing from the current DATs should be imported, or if all entries should be imported, overwriting anything currently existing. Then, click </Run><Run FontWeight="Bold">Begin Import</Run><Run> to perform this operation.</Run><LineBreak/><LineBreak/><Run>Please note that any unsaved artwork changes from this session will also be included.</Run></TextBlock>
+
+                    <!-- Radio buttons for import mode -->
+                    <StackPanel Grid.Row="1" Margin="0,0,0,15">
+                        <RadioButton x:Name="RadioImportMissing" Content="Import only missing entries" IsChecked="True" Foreground="Black"/>
+                        <RadioButton x:Name="RadioImportAll" Content="Import all entries (overwrite existing)" Foreground="Black"/>
+                    </StackPanel>
+
+                    <!-- Source folder display -->
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,15">
+                        <TextBlock Text="Source: " VerticalAlignment="Center" Foreground="Black" FontWeight="Bold"/>
+                        <TextBlock x:Name="TextImportSourcePath" Text="[no folder selected]" VerticalAlignment="Center"
+                                   Foreground="Gray" MaxWidth="380" TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+
+                    <!-- Buttons -->
+                    <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button Content="Choose DAT Folder" Click="ChooseImportFolder_Click" Padding="15,8" Margin="0,0,10,0"/>
+                        <Button x:Name="ButtonBeginImport" Content="Begin Import" Click="BeginImport_Click"
+                                Padding="15,8" IsEnabled="False"/>
+                    </StackPanel>
+                </Grid>
+            </TabItem>
+
+            <!-- Export Artwork to PNGs Tab -->
+            <TabItem Header="Export Artwork to PNGs">
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Instructions -->
+                    <TextBlock Grid.Row="0" TextWrapping="Wrap" Margin="0,0,0,15" Foreground="Black" xml:space="preserve"><Run>Export all assigned artwork, including any in-flight updates from this session, to PNG image files.</Run><LineBreak/><LineBreak/><Run>Image files will use the following file name syntax: </Run><Run FontWeight="Bold">Title [Serial].png</Run><LineBreak/><LineBreak/><Run>Select a target output folder, then click </Run><Run FontWeight="Bold">Begin Export</Run><Run> to perform this operation.</Run></TextBlock>
+
+                    <!-- Target folder display -->
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,15">
+                        <TextBlock Text="Target: " VerticalAlignment="Center" Foreground="Black" FontWeight="Bold"/>
+                        <TextBlock x:Name="TextExportTargetPath" Text="[no folder selected]" VerticalAlignment="Center"
+                                   Foreground="Gray" MaxWidth="380" TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+
+                    <!-- Buttons -->
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button Content="Choose Target Folder" Click="ChooseExportFolder_Click" Padding="15,8" Margin="0,0,10,0"/>
+                        <Button x:Name="ButtonBeginExport" Content="Begin Export" Click="BeginExport_Click"
+                                Padding="15,8" IsEnabled="False"/>
+                    </StackPanel>
+                </Grid>
+            </TabItem>
+
+            <!-- Clear All DAT Entries Tab -->
+            <TabItem Header="Clear All DAT Entries">
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Instructions -->
+                    <TextBlock Grid.Row="0" TextWrapping="Wrap" Margin="0,0,0,15" Foreground="Black" xml:space="preserve"><Run>Clear all artwork and metadata from BOX.DAT, ICON.DAT, and META.DAT.</Run><LineBreak/><LineBreak/><Run>Doing so will discard any unsaved artwork changes from Games List, as well as remove all saved entries.</Run><LineBreak/><LineBreak/><Run>Before this process is initiated, the DATs that currently reside in the "tools\openMenu\menu_data" will be backed up to the "dat_backups" folder.</Run><LineBreak/><LineBreak/><Run>Click </Run><Run FontWeight="Bold">Clear DATs</Run><Run> to perform this operation.</Run></TextBlock>
+
+                    <!-- Button -->
+                    <Button Grid.Row="1" Content="Clear DATs" Click="ClearDats_Click"
+                            Padding="15,8" HorizontalAlignment="Center"/>
+                </Grid>
+            </TabItem>
+        </TabControl>
+    </Grid>
+</Window>

@@ -670,7 +670,7 @@ run_cb(void) {
 
 static void
 menu_accept(void) {
-    if ((navigate_timeout > 0) || (list_len <= 0)) {
+    if (list_len <= 0) {
         return;
     }
 
@@ -726,7 +726,7 @@ menu_accept(void) {
             current_selected_item = 0;
             current_starting_index = 0;
         }
-        navigate_timeout = INPUT_TIMEOUT_INITIAL * 2;
+        navigate_timeout = 3;
         draw_current = DRAW_UI;
         return;
     }
@@ -783,7 +783,7 @@ menu_accept(void) {
 
 static void
 menu_cb(void) {
-    if ((navigate_timeout > 0) || (list_len <= 0)) {
+    if (list_len <= 0) {
         return;
     }
 
@@ -799,20 +799,12 @@ menu_cb(void) {
 
 static void
 menu_settings(void) {
-    if (navigate_timeout > 0) {
-        return;
-    }
-
     draw_current = DRAW_MENU;
     menu_setup(&draw_current, &cur_theme->colors, &navigate_timeout, cur_theme->menu_title_color);
 }
 
 static void
 menu_exit(void) {
-    if (navigate_timeout > 0) {
-        return;
-    }
-
     const gd_item* item = list_current[current_selected_item];
     set_cur_game_item(item);
 
@@ -825,10 +817,6 @@ menu_exit(void) {
 
 static void
 menu_go_back(void) {
-    if (navigate_timeout > 0) {
-        return;
-    }
-
     /* Go back one folder level if not at root */
     if (!list_folder_is_root()) {
         /* Go back and restore cursor position */
@@ -854,7 +842,7 @@ menu_go_back(void) {
             }
         }
 
-        navigate_timeout = INPUT_TIMEOUT_INITIAL;
+        navigate_timeout = 3;
     }
 }
 
@@ -966,7 +954,7 @@ FUNCTION(UI_NAME, setup) {
     /* Reset navigation state */
     current_selected_item = 0;
     current_starting_index = 0;
-    navigate_timeout = INPUT_TIMEOUT_INITIAL;
+    navigate_timeout = 3;
     draw_current = DRAW_UI;
 
     cusor_alpha = 255;
@@ -1008,6 +996,9 @@ FUNCTION(UI_NAME, drawTR) {
         case DRAW_PSX_LAUNCHER: {
             draw_psx_launcher_tr();
         } break;
+        case DRAW_SAVELOAD: {
+            draw_saveload_tr();
+        } break;
         case DRAW_DCNOW_PLAYERS: {
             draw_dcnow_tr();
         } break;
@@ -1042,6 +1033,9 @@ FUNCTION_INPUT(UI_NAME, handle_input) {
         } break;
         case DRAW_PSX_LAUNCHER: {
             handle_input_psx_launcher(input_current);
+        } break;
+        case DRAW_SAVELOAD: {
+            handle_input_saveload(input_current);
         } break;
         case DRAW_DCNOW_PLAYERS: {
             handle_input_dcnow(input_current);
