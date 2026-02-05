@@ -1874,6 +1874,21 @@ static const char* get_product_id_from_api_code(const char* api_code) {
     return api_code;
 }
 
+/* Find a game in the library by product ID */
+static const gd_item* find_game_by_product(const char* product_id) {
+    if (!product_id || product_id[0] == '\0') {
+        return NULL;
+    }
+    const gd_item** games = list_get();
+    int count = list_length();
+    for (int i = 0; i < count; i++) {
+        if (games[i] && strcmp(games[i]->product, product_id) == 0) {
+            return games[i];
+        }
+    }
+    return NULL;
+}
+
 typedef enum {
     DCNOW_VIEW_GAMES,    /* Showing list of games */
     DCNOW_VIEW_PLAYERS   /* Showing list of players for selected game */
@@ -1890,7 +1905,11 @@ static bool dcnow_needs_fetch = false;  /* Flag to trigger fetch on next frame *
 static bool dcnow_shown_loading = false;  /* Track if we've displayed loading screen */
 static bool dcnow_net_initialized = false;
 static char connection_status[128] = "";
+static bool dcnow_is_connecting = false;     /* Connection in progress */
+static bool dcnow_needs_connect = false;     /* Trigger connection on next frame */
+static bool dcnow_shown_connecting = false;  /* Shown connecting message */
 static int* dcnow_navigate_timeout = NULL;  /* Pointer to navigate timeout for input debouncing */
+static int dcnow_connect_anim_frame = 0;    /* Animation frame counter for connecting dots */
 
 /* Timestamp (ms) of the last successful fetch — 0 until first fetch completes */
 static uint64_t dcnow_last_fetch_ms = 0;
@@ -1901,93 +1920,33 @@ static dcnow_data_t dcnow_temp_data;
 #define DCNOW_INPUT_TIMEOUT_REPEAT (4)
 #define DCNOW_AUTO_REFRESH_MS       60000  /* 60 seconds between auto-refreshes */
 
-/* Visual callback for network connection status - renders full scene with stunning visuals */
+/* Extern the render function pointers from main.c */
+extern void (*current_ui_draw_OP)(void);
+extern void (*current_ui_draw_TR)(void);
+
+/* Visual callback for network connection status - renders within existing DC Now popup */
 static void dcnow_connection_status_callback(const char* message) {
-    /* Render a single frame with the status message */
+    /* Store status message for draw_dcnow_tr to display */
+    strncpy(connection_status, message, sizeof(connection_status) - 1);
+    connection_status[sizeof(connection_status) - 1] = '\0';
+
+    /* Render a complete frame using the normal render path */
     pvr_wait_ready();
     pvr_scene_begin();
 
-    /* Opaque pass - draw dark background  */
     draw_set_list(PVR_LIST_OP_POLY);
     pvr_list_begin(PVR_LIST_OP_POLY);
-
-    /* Full screen dark background with gradient effect */
-    draw_draw_quad(0, 0, 640, 480, 0xFF1A1A2E);
-
+    (*current_ui_draw_OP)();
     pvr_list_finish();
 
-    /* Transparent pass - draw status box and text */
     draw_set_list(PVR_LIST_TR_POLY);
     pvr_list_begin(PVR_LIST_TR_POLY);
-
-    /* Stunning multi-layer border effect */
-    const int border_width = 6;
-    const int box_x = 120;
-    const int box_y = 180;
-    const int box_width = 400;
-    const int box_height = 120;
-
-    /* Outer glow - cyan */
-    draw_draw_quad(box_x - border_width - 2, box_y - border_width - 2,
-                   box_width + (2 * (border_width + 2)), box_height + (2 * (border_width + 2)),
-                   0x4000DDFF);
-
-    /* Main border - bright cyan gradient effect */
-    draw_draw_quad(box_x - border_width, box_y - border_width,
-                   box_width + (2 * border_width), box_height + (2 * border_width),
-                   0xFF00DDFF);
-
-    /* Inner border accent - electric blue */
-    draw_draw_quad(box_x - (border_width / 2), box_y - (border_width / 2),
-                   box_width + border_width, box_height + border_width,
-                   0xFF0099FF);
-
-    /* Deep blue-black background with slight transparency for depth */
-    draw_draw_quad(box_x, box_y, box_width, box_height, 0xF0001133);
-
-    /* Draw text with color coding based on message content */
-    font_bmp_begin_draw();
-
-    /* Title in bright cyan */
-    font_bmp_set_color(0xFF00DDFF);
-    font_bmp_draw_main(240, 200, "Dreamcast NOW!");
-
-    /* Determine message color based on content */
-    uint32_t msg_color = 0xFFFFFFFF;  /* Default: white */
-    if (strstr(message, "Initializing") || strstr(message, "Setting")) {
-        msg_color = 0xFF00AAFF;  /* Blue for initialization */
-    } else if (strstr(message, "Dialing") || strstr(message, "Connecting")) {
-        msg_color = 0xFFFFAA00;  /* Orange for active connection */
-    } else if (strstr(message, "Connected") || strstr(message, "ready")) {
-        msg_color = 0xFF00FF66;  /* Green for success */
-    } else if (strstr(message, "failed") || strstr(message, "Failed")) {
-        msg_color = 0xFFFF3333;  /* Red for errors */
-    }
-
-    font_bmp_set_color(msg_color);
-    /* Center the message horizontally */
-    int msg_len = strlen(message);
-    int msg_x = 320 - (msg_len * 8 / 2);
-    font_bmp_draw_main(msg_x, 235, message);
-
-    /* Progress indicator dots for active states */
-    if (strstr(message, "Dialing") || strstr(message, "Connecting") ||
-        strstr(message, "Initializing") || strstr(message, "Setting")) {
-        font_bmp_set_color(0xFF00DDFF);
-        static int dot_count = 0;
-        dot_count = (dot_count + 1) % 4;
-        char dots[5] = "";
-        for (int i = 0; i < dot_count; i++) {
-            strcat(dots, ".");
-        }
-        font_bmp_draw_main(320, 260, dots);
-    }
-
+    (*current_ui_draw_TR)();
     pvr_list_finish();
+
     pvr_scene_finish();
 
-    /* Hold frame so it's visible */
-    thd_sleep(600);
+    /* No thd_sleep - the 500ms delay in update_status() is enough */
 }
 
 void
@@ -2041,35 +2000,6 @@ dcnow_setup(enum draw_state* state, struct theme_color* _colors, int* timeout_pt
     }
 }
 
-/* Helper to render a connection status frame before blocking operation */
-static void render_connection_frame(const char* message) {
-    pvr_wait_ready();
-    pvr_scene_begin();
-
-    draw_set_list(PVR_LIST_OP_POLY);
-    pvr_list_begin(PVR_LIST_OP_POLY);
-    pvr_list_finish();
-
-    draw_set_list(PVR_LIST_TR_POLY);
-    pvr_list_begin(PVR_LIST_TR_POLY);
-
-    /* White border */
-    const int border_width = 2;
-    draw_draw_quad(160 - border_width, 200 - border_width,
-                   320 + (2 * border_width), 80 + (2 * border_width),
-                   0xFFFFFFFF);
-
-    /* Black background */
-    draw_draw_quad(160, 200, 320, 80, 0xFF000000);
-
-    /* Message */
-    font_bmf_begin_draw();
-    font_bmf_draw_centered(320, 230, 0xFFFFFFFF, message);
-
-    pvr_list_finish();
-    pvr_scene_finish();
-}
-
 void
 handle_input_dcnow(enum control input) {
     /* Check navigate timeout to prevent input skipping */
@@ -2081,28 +2011,13 @@ handle_input_dcnow(enum control input) {
         case A: {
             /* A button: Connect / Fetch data / Drill down into game */
             if (!dcnow_net_initialized) {
-                /* Connect to DreamPi */
-                printf("DC Now: Starting connection...\n");
-                dcnow_set_status_callback(dcnow_connection_status_callback);
-                int net_result = dcnow_net_early_init();
-                dcnow_set_status_callback(NULL);
-
-                if (net_result < 0) {
-                    printf("DC Now: Connection failed: %d\n", net_result);
-                    memset(&dcnow_data, 0, sizeof(dcnow_data));
-                    snprintf(dcnow_data.error_message, sizeof(dcnow_data.error_message),
-                            "Connection failed (error %d). Press A to retry", net_result);
-                    dcnow_data.data_valid = false;
-                    /* Don't set dcnow_net_initialized = true on failure! */
-                    /* User needs to be able to retry connection */
-                } else {
-                    printf("DC Now: Connection successful\n");
-                    dcnow_net_initialized = true;
-                    memset(&dcnow_data, 0, sizeof(dcnow_data));
-                    snprintf(dcnow_data.error_message, sizeof(dcnow_data.error_message),
-                            "Connected! Press X to fetch data");
-                    dcnow_data.data_valid = false;
-                }
+                /* Request connection (deferred like refresh) */
+                printf("DC Now: Requesting connection...\n");
+                dcnow_is_connecting = true;
+                dcnow_needs_connect = true;
+                dcnow_shown_connecting = false;
+                strncpy(connection_status, "Connecting...", sizeof(connection_status) - 1);
+                if (dcnow_navigate_timeout) *dcnow_navigate_timeout = DCNOW_INPUT_TIMEOUT_INITIAL;
             } else if (!dcnow_data.data_valid) {
                 /* Fetch initial data */
                 printf("DC Now: Requesting initial fetch...\n");
@@ -2127,8 +2042,21 @@ handle_input_dcnow(enum control input) {
             }
         } break;
         case X: {
-            /* X button: Refresh data */
-            if (dcnow_net_initialized && dcnow_data.data_valid) {
+            /* X button: Launch game (player view) or Refresh (game view) */
+            if (dcnow_view == DCNOW_VIEW_PLAYERS && dcnow_selected_game >= 0 &&
+                dcnow_selected_game < dcnow_data.game_count) {
+                /* Try to launch the game being viewed */
+                const char* api_code = dcnow_data.games[dcnow_selected_game].game_code;
+                const char* product_id = get_product_id_from_api_code(api_code);
+                const gd_item* game = find_game_by_product(product_id);
+                if (game) {
+                    printf("DC Now: Launching game '%s'\n", game->name);
+                    dreamcast_launch_disc(game);
+                    /* Note: This will not return if launch succeeds */
+                }
+                /* If game not found in library, do nothing */
+                if (dcnow_navigate_timeout) *dcnow_navigate_timeout = DCNOW_INPUT_TIMEOUT_INITIAL;
+            } else if (dcnow_net_initialized && dcnow_data.data_valid) {
                 printf("DC Now: Requesting refresh...\n");
                 dcnow_data_fetched = false;
                 dcnow_data.data_valid = false;
@@ -2284,6 +2212,35 @@ draw_dcnow_tr(void) {
         dcnow_is_loading = false;
     }
 
+    /* Execute deferred connection (after showing connecting message) */
+    if (dcnow_needs_connect && dcnow_shown_connecting) {
+        dcnow_needs_connect = false;
+        printf("DC Now: Executing connection...\n");
+
+        /* Enable status callback to show progress within popup style */
+        dcnow_set_status_callback(dcnow_connection_status_callback);
+        int net_result = dcnow_net_early_init();
+        dcnow_set_status_callback(NULL);
+
+        if (net_result < 0) {
+            printf("DC Now: Connection failed: %d\n", net_result);
+            memset(&dcnow_data, 0, sizeof(dcnow_data));
+            snprintf(dcnow_data.error_message, sizeof(dcnow_data.error_message),
+                    "Connection failed (error %d). Press A to retry", net_result);
+            dcnow_data.data_valid = false;
+        } else {
+            printf("DC Now: Connection successful, triggering auto-fetch\n");
+            dcnow_net_initialized = true;
+            /* Immediately trigger data fetch instead of showing "Press X to fetch" */
+            dcnow_needs_fetch = true;
+            dcnow_is_loading = true;
+            dcnow_shown_loading = false;
+        }
+
+        dcnow_is_connecting = false;
+        connection_status[0] = '\0';
+    }
+
     /* Auto-refresh every 60 seconds while the popup is open with valid data */
     if (dcnow_net_initialized && dcnow_data.data_valid && !dcnow_is_loading && dcnow_last_fetch_ms > 0) {
         uint64_t now = timer_ms_gettime64();
@@ -2415,7 +2372,24 @@ draw_dcnow_tr(void) {
 
         cur_y += title_gap;
 
-        if (dcnow_is_loading) {
+        if (dcnow_is_connecting) {
+            /* Show animated connecting message with detailed status if available */
+            dcnow_connect_anim_frame++;
+            int dot_count = ((dcnow_connect_anim_frame / 30) % 3) + 1;  /* Cycles 1-3 dots every ~0.5s at 60fps */
+
+            /* Use detailed status if available, otherwise generic "Connecting" */
+            char connect_msg[140];
+            if (connection_status[0] != '\0') {
+                snprintf(connect_msg, sizeof(connect_msg), "%s%.*s", connection_status, dot_count, "...");
+            } else {
+                snprintf(connect_msg, sizeof(connect_msg), "Connecting%.*s", dot_count, "...");
+            }
+
+            font_bmp_set_color(0xFFFFAA00);  /* Orange */
+            font_bmp_draw_main(x_item, cur_y, connect_msg);
+            dcnow_shown_connecting = true;
+            cur_y += line_height;
+        } else if (dcnow_is_loading) {
             /* Show loading message */
             font_bmp_set_color(text_color);
             font_bmp_draw_main(x_item, cur_y, "Refreshing... Please Wait");
@@ -2439,6 +2413,11 @@ draw_dcnow_tr(void) {
                 /* Draw player count in yellow-green */
                 font_bmp_set_color(0xFFAAFF00);
                 font_bmp_draw_main(x_item + name_width, cur_y, player_count_buf);
+                cur_y += line_height;
+
+                /* Divider line below game title */
+                font_bmp_set_color(0xFF00DDFF);  /* Cyan */
+                font_bmp_draw_main(x_item, cur_y, "----------------------------------------");
                 cur_y += line_height;
 
                 int player_count = dcnow_data.games[dcnow_selected_game].player_count;
@@ -2600,7 +2579,27 @@ draw_dcnow_tr(void) {
 
         /* Instructions with stunning Dreamcast button color-coding */
         int instr_x = x_item;
-        if (dcnow_view == DCNOW_VIEW_PLAYERS) {
+        if (dcnow_is_connecting) {
+            /* Show "please hold" message during connection */
+            font_bmp_set_color(0xFFBBBBBB);  /* Light gray */
+            font_bmp_draw_main(instr_x, cur_y, "Please hold while we connect you");
+        } else if (dcnow_view == DCNOW_VIEW_PLAYERS) {
+            /* Check if game is in library to show launch option */
+            const gd_item* launch_game = NULL;
+            if (dcnow_selected_game >= 0 && dcnow_selected_game < dcnow_data.game_count) {
+                const char* api_code = dcnow_data.games[dcnow_selected_game].game_code;
+                const char* product_id = get_product_id_from_api_code(api_code);
+                launch_game = find_game_by_product(product_id);
+            }
+            if (launch_game) {
+                /* X button - YELLOW */
+                font_bmp_set_color(0xFFFFCC00);
+                font_bmp_draw_main(instr_x, cur_y, "X");
+                instr_x += 8;
+                font_bmp_set_color(0xFFCCCCCC);
+                font_bmp_draw_main(instr_x, cur_y, "=Launch");
+                instr_x += 7 * 8 + 16;  /* text + 16px gap */
+            }
             /* B button - BLUE */
             font_bmp_set_color(0xFF3399FF);
             font_bmp_draw_main(instr_x, cur_y, "B");
@@ -2775,7 +2774,23 @@ draw_dcnow_tr(void) {
         }
         cur_y += title_gap;
 
-        if (dcnow_is_loading) {
+        if (dcnow_is_connecting) {
+            /* Show animated connecting message with detailed status if available */
+            dcnow_connect_anim_frame++;
+            int dot_count = ((dcnow_connect_anim_frame / 30) % 3) + 1;  /* Cycles 1-3 dots every ~0.5s at 60fps */
+
+            /* Use detailed status if available, otherwise generic "Connecting" */
+            char connect_msg[140];
+            if (connection_status[0] != '\0') {
+                snprintf(connect_msg, sizeof(connect_msg), "%s%.*s", connection_status, dot_count, "...");
+            } else {
+                snprintf(connect_msg, sizeof(connect_msg), "Connecting%.*s", dot_count, "...");
+            }
+
+            cur_y += line_height;
+            font_bmf_draw(x_item, cur_y, 0xFFFFAA00, connect_msg);  /* Orange */
+            dcnow_shown_connecting = true;
+        } else if (dcnow_is_loading) {
             cur_y += line_height;
             font_bmf_draw(x_item, cur_y, text_color, "Refreshing... Please Wait");
             dcnow_shown_loading = true;  /* Mark that we've shown the loading screen */
@@ -2799,6 +2814,10 @@ draw_dcnow_tr(void) {
                 /* Draw player count in yellow-green (estimate width) */
                 int count_x = name_x + (strlen(game_name_buf) * 10);
                 font_bmf_draw(count_x, cur_y, 0xFFAAFF00, player_count_buf);
+
+                /* Divider line below game title */
+                cur_y += line_height;
+                font_bmf_draw(x_item, cur_y, 0xFF00DDFF, "----------------------------------------");  /* Cyan */
 
                 int player_count = dcnow_data.games[dcnow_selected_game].player_count;
                 int visible_count = (player_count < max_visible_games) ? player_count : max_visible_games;
@@ -2946,7 +2965,24 @@ draw_dcnow_tr(void) {
 
         /* Instructions with stunning Dreamcast button color-coding */
         int instr_x = x_item;
-        if (dcnow_view == DCNOW_VIEW_PLAYERS) {
+        if (dcnow_is_connecting) {
+            /* Show "please hold" message during connection */
+            font_bmf_draw(instr_x, cur_y, 0xFFBBBBBB, "Please hold while we connect you");  /* Light gray */
+        } else if (dcnow_view == DCNOW_VIEW_PLAYERS) {
+            /* Check if game is in library to show launch option */
+            const gd_item* launch_game = NULL;
+            if (dcnow_selected_game >= 0 && dcnow_selected_game < dcnow_data.game_count) {
+                const char* api_code = dcnow_data.games[dcnow_selected_game].game_code;
+                const char* product_id = get_product_id_from_api_code(api_code);
+                launch_game = find_game_by_product(product_id);
+            }
+            if (launch_game) {
+                /* X button - YELLOW */
+                font_bmf_draw(instr_x, cur_y, 0xFFFFCC00, "X");
+                instr_x += 12;
+                font_bmf_draw(instr_x, cur_y, 0xFFCCCCCC, "=Launch");
+                instr_x += 70 + 20;  /* text + 20px gap */
+            }
             /* B button - BLUE */
             font_bmf_draw(instr_x, cur_y, 0xFF3399FF, "B");
             instr_x += 12;
