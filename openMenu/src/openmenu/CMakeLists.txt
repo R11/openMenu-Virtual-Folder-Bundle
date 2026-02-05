@@ -35,6 +35,7 @@ set(OPENMENU_SOURCES
         src/dcnow/dcnow_json.c
         src/dcnow/dcnow_net_init.c
         src/dcnow/dcnow_vmu.c
+        src/dcnow/dcnow_worker.c
 )
 
 add_executable(openmenu ${OPENMENU_SOURCES})
