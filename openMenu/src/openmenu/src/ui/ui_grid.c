@@ -22,6 +22,7 @@
 #include "ui/font_prototypes.h"
 #include "ui/ui_common.h"
 #include "ui/ui_menu_credits.h"
+#include "ui/dc/input.h"
 
 #include "ui/ui_grid.h"
 
@@ -461,7 +462,7 @@ menu_right(void) {
 
 static void
 menu_cb(void) {
-    if ((navigate_timeout > 0) || (list_len <= 0)) {
+    if (list_len <= 0) {
         return;
     }
 
@@ -497,7 +498,7 @@ run_cb(void) {
 
 static void
 menu_accept(void) {
-    if ((navigate_timeout > 0) || (list_len <= 0)) {
+    if (list_len <= 0) {
         return;
     }
 
@@ -523,7 +524,7 @@ menu_accept(void) {
         current_starting_index = 0;
         draw_current = DRAW_UI;
 
-        navigate_timeout = INPUT_TIMEOUT * 2;
+        navigate_timeout = 3;
 
         anim_clear(&anim_highlight);
         anim_clear(&anim_large_art_pos);
@@ -563,9 +564,6 @@ menu_accept(void) {
 
 static void
 menu_settings(void) {
-    if (navigate_timeout > 0) {
-        return;
-    }
 
     draw_current = DRAW_MENU;
     menu_setup(&draw_current, current_theme_colors, &navigate_timeout, current_theme_colors->menu_highlight_color);
@@ -603,9 +601,6 @@ menu_show_large_art(void) {
 
 static void
 menu_exit(void) {
-    if (navigate_timeout > 0) {
-        return;
-    }
 
     set_cur_game_item(list_current[current_selected()]);
     draw_current = DRAW_EXIT;
@@ -680,6 +675,19 @@ handle_input_ui(enum control input) {
     direction_last = direction_current;
     direction_current = false;
     boxart_button_held = false;
+
+    /* Check for L+R triggers pressed together to open DC Now popup */
+    if (input == TRIG_L && INPT_TriggerPressed(TRIGGER_R)) {
+        /* Both triggers pressed - open DC Now popup */
+        dcnow_setup(&draw_current, current_theme_colors, &navigate_timeout, current_theme_colors->menu_highlight_color);
+        return;
+    }
+    if (input == TRIG_R && INPT_TriggerPressed(TRIGGER_L)) {
+        /* Both triggers pressed - open DC Now popup */
+        dcnow_setup(&draw_current, current_theme_colors, &navigate_timeout, current_theme_colors->menu_highlight_color);
+        return;
+    }
+
     switch (input) {
         case LEFT:
             direction_current = true;
@@ -735,7 +743,7 @@ FUNCTION(UI_NAME, setup) {
     current_starting_index = 0;
     draw_current = DRAW_UI;
 
-    navigate_timeout = INPUT_TIMEOUT * 2;
+    navigate_timeout = 3;
 
     anim_clear(&anim_highlight);
     anim_clear(&anim_large_art_pos);
@@ -765,6 +773,13 @@ FUNCTION_INPUT(UI_NAME, handle_input) {
         } break;
         case DRAW_PSX_LAUNCHER: {
             handle_input_psx_launcher(input_current);
+        } break;
+
+        case DRAW_SAVELOAD: {
+            handle_input_saveload(input_current);
+        } break;
+        case DRAW_DCNOW_PLAYERS: {
+            handle_input_dcnow(input_current);
         } break;
         default:
         case DRAW_UI: {
@@ -801,6 +816,15 @@ FUNCTION(UI_NAME, drawOP) {
         case DRAW_PSX_LAUNCHER: {
             /* PSX launcher popup on top */
             draw_psx_launcher_op();
+        } break;
+
+        case DRAW_SAVELOAD: {
+            /* Save/Load popup on top */
+            draw_saveload_op();
+        } break;
+        case DRAW_DCNOW_PLAYERS: {
+            /* DC Now popup on top */
+            draw_dcnow_op();
         } break;
         default:
         case DRAW_UI: {
@@ -839,6 +863,15 @@ FUNCTION(UI_NAME, drawTR) {
         case DRAW_PSX_LAUNCHER: {
             /* PSX launcher popup on top */
             draw_psx_launcher_tr();
+        } break;
+
+        case DRAW_SAVELOAD: {
+            /* Save/Load popup on top */
+            draw_saveload_tr();
+        } break;
+        case DRAW_DCNOW_PLAYERS: {
+            /* DC Now popup on top */
+            draw_dcnow_tr();
         } break;
         default:
         case DRAW_UI: {

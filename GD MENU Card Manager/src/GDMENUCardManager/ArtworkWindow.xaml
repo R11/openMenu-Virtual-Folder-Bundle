@@ -1,0 +1,66 @@
+<Window x:Class="GDMENUCardManager.ArtworkWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="{Binding WindowTitle}" Height="450" Width="420" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner">
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="1*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Serial ID -->
+        <TextBlock Grid.Row="0" Text="{Binding Serial}" FontWeight="Bold" Foreground="Black"
+                   HorizontalAlignment="Center" Margin="0,0,0,10"/>
+
+        <!-- Image Preview -->
+        <Border Grid.Row="1" BorderBrush="Gray" BorderThickness="1"
+                Width="260" Height="260" HorizontalAlignment="Center" VerticalAlignment="Center">
+            <Grid>
+                <TextBlock Text="No artwork assigned" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasPreviewImage}" Value="False">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <Image Source="{Binding PreviewImage}" Stretch="Uniform">
+                    <Image.Style>
+                        <Style TargetType="Image">
+                            <Setter Property="Visibility" Value="Visible"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasPreviewImage}" Value="False">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Image.Style>
+                </Image>
+            </Grid>
+        </Border>
+
+        <!-- Info Label -->
+        <TextBlock Grid.Row="2" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Margin="0,10,0,0" Foreground="Black">
+            <Run Text="Artwork changes aren't written to DAT files until clicking "/><Run Text="Save Changes" FontWeight="Bold"/><Run Text=" in the main window."/>
+        </TextBlock>
+
+        <!-- Buttons -->
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,15,0,0">
+            <Button Content="Browse for Image" Click="BrowseImage_Click" Margin="0,0,10,0" Padding="15,8"/>
+            <Button Content="Delete Entry" Click="DeleteEntry_Click" Margin="0,0,10,0" Padding="15,8"
+                    IsEnabled="{Binding CanDelete}"/>
+            <Button Content="Save" Click="Apply_Click" Padding="15,8"
+                    IsEnabled="{Binding HasUnsavedChanges}"/>
+        </StackPanel>
+    </Grid>
+</Window>

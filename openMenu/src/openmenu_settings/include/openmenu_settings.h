@@ -83,6 +83,10 @@ extern uint8_t* sf_boot_mode;
 #define sf_boot_mode_type   CRAYON_TYPE_UINT8
 #define sf_boot_mode_length 1
 
+extern uint8_t* sf_dcnow_vmu;
+#define sf_dcnow_vmu_type   CRAYON_TYPE_UINT8
+#define sf_dcnow_vmu_length 1
+
 enum savefile_version {
     SFV_INITIAL = 1,
     SFV_BIOS_3D,
@@ -96,6 +100,7 @@ enum savefile_version {
     SFV_MULTIDISC_GROUPING,
     SFV_VM2_SEND_ALL,
     SFV_BOOT_MODE,
+    SFV_DCNOW_VMU,
     SFV_LATEST_PLUS_ONE //DON'T REMOVE
 };
 
@@ -265,9 +270,16 @@ typedef enum CFG_BOOT_MODE {
     BOOT_MODE_END = BOOT_MODE_FAST
 } CFG_BOOT_MODE;
 
+typedef enum CFG_DCNOW_VMU {
+    DCNOW_VMU_START = 0,
+    DCNOW_VMU_ON = DCNOW_VMU_START,
+    DCNOW_VMU_OFF,
+    DCNOW_VMU_END = DCNOW_VMU_OFF
+} CFG_DCNOW_VMU;
+
 typedef CFG_REGION region;
 
-enum draw_state { DRAW_UI = 0, DRAW_MULTIDISC, DRAW_EXIT, DRAW_MENU, DRAW_CREDITS, DRAW_CODEBREAKER, DRAW_PSX_LAUNCHER };
+enum draw_state { DRAW_UI = 0, DRAW_MULTIDISC, DRAW_EXIT, DRAW_MENU, DRAW_CREDITS, DRAW_CODEBREAKER, DRAW_PSX_LAUNCHER, DRAW_SAVELOAD, DRAW_DCNOW_PLAYERS };
 
 void settings_sanitize();
 

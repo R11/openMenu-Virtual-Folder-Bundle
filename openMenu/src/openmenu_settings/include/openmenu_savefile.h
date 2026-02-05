@@ -15,4 +15,15 @@ void savefile_init();
 void savefile_close();
 int8_t savefile_save();
 
+/* Save/Load window helper functions */
+int8_t savefile_get_device_status(int8_t device_id);
+uint32_t savefile_get_device_version(int8_t device_id);
+void savefile_refresh_device_info(void);
+int8_t savefile_save_to_device(int8_t device_id);
+int8_t savefile_load_from_device(int8_t device_id);
+int8_t savefile_get_startup_device_id(void);
+void savefile_show_success_icon(int8_t device_id);
+uint32_t savefile_get_save_size_blocks(void);
+uint32_t savefile_get_device_free_blocks(int8_t device_id);
+
 #endif //OPENMENU_SAVEFILE_H

@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <kos/init.h>
 #include <arch/exec.h>
 #include <dc/cdrom.h>
 #include <dc/flashrom.h>
@@ -31,6 +32,8 @@
 #include "ui/ui_common.h"
 #include "ui/ui_menu_credits.h"
 #include "vm2/vm2_api.h"
+#include "dcnow/dcnow_net_init.h"
+#include "dcnow/dcnow_vmu.h"
 
 /* UI Collection */
 #include "ui/ui_grid.h"
@@ -44,6 +47,9 @@
 
 #include "bloader.h"
 #include "texture/txr_manager.h"
+
+/* Initialize KOS with network support - CRITICAL for socket() to work! */
+KOS_INIT_FLAGS(INIT_DEFAULT | INIT_NET);
 
 /* VM2/VMUPro/USB4Maple device tracking */
 #define VM2_MAX_DEVICES 8
@@ -197,6 +203,12 @@ draw(void) {
     pvr_list_finish();
 
     pvr_scene_finish();
+
+    /* Update VMU display (scroll animation + time indicator) if DC Now is active */
+    dcnow_vmu_tick_scroll();
+
+    /* Background auto-refresh for DC Now data (every 60 seconds) */
+    dcnow_background_tick();
 }
 
 static void
@@ -270,6 +282,21 @@ static int
 translate_input(void) {
     processInput();
 
+    /* Check for ABXY+Start reset combo - disconnect modem and reset console */
+    if (INPT_ButtonEx(BTN_A, BTN_HELD) &&
+        INPT_ButtonEx(BTN_B, BTN_HELD) &&
+        INPT_ButtonEx(BTN_X, BTN_HELD) &&
+        INPT_ButtonEx(BTN_Y, BTN_HELD) &&
+        INPT_ButtonEx(BTN_START, BTN_HELD)) {
+        printf("ABXY+Start detected - disconnecting and resetting...\n");
+
+        /* Disconnect modem/PPP before reset */
+        dcnow_net_disconnect();
+
+        /* Reset console - same as exit to BIOS */
+        arch_exec_at(bloader_data, bloader_size, 0xacf00000);
+    }
+
     /* D-Pad directions */
     if (INPT_DPADDirection(DPAD_LEFT)) {
         return LEFT;
@@ -299,20 +326,22 @@ translate_input(void) {
         return DOWN;
     }
 
-    /* Buttons */
-    if (INPT_Button(BTN_A)) {
+    /* Buttons - use edge detection (BTN_PRESS) for A, B, Y, START to prevent
+     * double-press bugs when transitioning between UI states. X keeps hold
+     * detection for grid mode artwork zoom feature. */
+    if (INPT_ButtonEx(BTN_A, BTN_PRESS)) {
         return A;
     }
-    if (INPT_Button(BTN_B)) {
+    if (INPT_ButtonEx(BTN_B, BTN_PRESS)) {
         return B;
     }
     if (INPT_Button(BTN_X)) {
         return X;
     }
-    if (INPT_Button(BTN_Y)) {
+    if (INPT_ButtonEx(BTN_Y, BTN_PRESS)) {
         return Y;
     }
-    if (INPT_Button(BTN_START)) {
+    if (INPT_ButtonEx(BTN_START, BTN_PRESS)) {
         return START;
     }
 
@@ -340,24 +369,24 @@ translate_input(void) {
             return DOWN;
         }
 
-        /* Z or Space → A button */
-        if (INPT_KeyboardButton(KBD_KEY_Z) || INPT_KeyboardButton(KBD_KEY_SPACE)) {
+        /* Z or Space → A button (edge-detected) */
+        if (INPT_KeyboardButtonPress(KBD_KEY_Z) || INPT_KeyboardButtonPress(KBD_KEY_SPACE)) {
             return A;
         }
-        /* X or Escape → B button */
-        if (INPT_KeyboardButton(KBD_KEY_X) || INPT_KeyboardButton(KBD_KEY_ESCAPE)) {
+        /* X or Escape → B button (edge-detected) */
+        if (INPT_KeyboardButtonPress(KBD_KEY_X) || INPT_KeyboardButtonPress(KBD_KEY_ESCAPE)) {
             return B;
         }
-        /* A → X button */
+        /* A → X button (hold-detected for grid artwork zoom) */
         if (INPT_KeyboardButton(KBD_KEY_A)) {
             return X;
         }
-        /* S → Y button */
-        if (INPT_KeyboardButton(KBD_KEY_S)) {
+        /* S → Y button (edge-detected) */
+        if (INPT_KeyboardButtonPress(KBD_KEY_S)) {
             return Y;
         }
-        /* Enter → Start */
-        if (INPT_KeyboardButton(KBD_KEY_ENTER)) {
+        /* Enter → Start (edge-detected) */
+        if (INPT_KeyboardButtonPress(KBD_KEY_ENTER)) {
             return START;
         }
 
@@ -458,6 +487,9 @@ main(int argc, char* argv[]) {
 
 void
 exit_to_bios_ex(int do_mount, int do_send_id) {
+    /* Disconnect modem/PPP before exiting to ensure clean state */
+    dcnow_net_disconnect();
+
     bloader_cfg_t* bloader_config = (bloader_cfg_t*)&bloader_data[bloader_size - sizeof(bloader_cfg_t)];
 
     bloader_config->enable_wide = sf_aspect[0];

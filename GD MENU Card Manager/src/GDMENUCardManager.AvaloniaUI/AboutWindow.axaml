@@ -1,0 +1,175 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="680" d:DesignHeight="400"
+        x:Class="GDMENUCardManager.AboutWindow"
+        Title="About" SizeToContent="Height" Width="680" CanResize="False"
+        WindowStartupLocation="CenterOwner">
+    <Window.Resources>
+        <Viewbox x:Key="ViewOpenInNew" Width="12" Height="12">
+            <Canvas Width="24" Height="24">
+                <Path Fill="Black" Data="M14,3V5H17.59L7.76,14.83L9.17,16.24L19,6.41V10H21V3M19,19H5V5H12V3H5C3.89,3 3,3.9 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V12H19V19Z" />
+            </Canvas>
+        </Viewbox>
+    </Window.Resources>
+    <Grid Margin="15">
+        <StackPanel>
+            <!-- Header -->
+            <TextBlock FontWeight="Bold" FontSize="16">GD MENU Card Manager - by Sonik (ateam version)</TextBlock>
+            <TextBlock Margin="0,2,0,0">A tool to manage a GDEMU SD card and its contents</TextBlock>
+            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                <TextBlock>https://github.com/DerekPascarella/openMenu-Virtual-Folder-Bundle</TextBlock>
+                <Button Margin="5,0,0,0" ToolTip.Tip="Open Link" Padding="2" Background="Transparent" BorderBrush="Transparent" Click="ButtonLink_Click">
+                    <ContentControl Content="{StaticResource ViewOpenInNew}"/>
+                </Button>
+            </StackPanel>
+
+            <Rectangle Fill="Gray" Height="1" Margin="0,12"/>
+
+            <!-- Two-column content -->
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="20"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Vertical separator -->
+                <Rectangle Grid.Column="1" Width="1" Fill="Gray" HorizontalAlignment="Center"/>
+
+                <!-- Left Column -->
+                <StackPanel Grid.Column="0">
+                    <!-- Supported Formats -->
+                    <TextBlock FontWeight="Bold">Supported Formats</TextBlock>
+                    <TextBlock Margin="0,4,0,0">Image: GDI, CDI, CCD, MDS, CUE/BIN (Redump)</TextBlock>
+                    <TextBlock>Compressed: 7Z, RAR, ZIP</TextBlock>
+
+                    <Rectangle Fill="Gray" Height="1" Margin="0,12"/>
+
+                    <!-- Keyboard Shortcuts -->
+                    <TextBlock FontWeight="Bold">Keyboard Shortcuts</TextBlock>
+                    <Grid Margin="0,4,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="80"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Grid.Column="0" FontWeight="SemiBold">Delete</TextBlock>
+                        <TextBlock Grid.Row="0" Grid.Column="1">Remove selected item(s)</TextBlock>
+                        <TextBlock Grid.Row="1" Grid.Column="0" FontWeight="SemiBold">Escape</TextBlock>
+                        <TextBlock Grid.Row="1" Grid.Column="1">Close window</TextBlock>
+                        <TextBlock Grid.Row="2" Grid.Column="0" FontWeight="SemiBold">F2</TextBlock>
+                        <TextBlock Grid.Row="2" Grid.Column="1">Rename selected item</TextBlock>
+                        <TextBlock Grid.Row="3" Grid.Column="0" FontWeight="SemiBold">Ctrl+Z/Y</TextBlock>
+                        <TextBlock Grid.Row="3" Grid.Column="1">Undo/Redo</TextBlock>
+                    </Grid>
+
+                    <Rectangle Fill="Gray" Height="1" Margin="0,12"/>
+
+                    <!-- Managing Games -->
+                    <TextBlock FontWeight="Bold">Managing Games</TextBlock>
+                    <Grid Margin="0,4,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="80"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Grid.Column="0" FontWeight="SemiBold">Add</TextBlock>
+                        <TextBlock Grid.Row="0" Grid.Column="1">[+] or drag and drop</TextBlock>
+                        <TextBlock Grid.Row="1" Grid.Column="0" FontWeight="SemiBold">Remove</TextBlock>
+                        <TextBlock Grid.Row="1" Grid.Column="1">[-] or Delete key</TextBlock>
+                        <TextBlock Grid.Row="2" Grid.Column="0" FontWeight="SemiBold">Reorder</TextBlock>
+                        <TextBlock Grid.Row="2" Grid.Column="1">Up/Down buttons</TextBlock>
+                        <TextBlock Grid.Row="3" Grid.Column="0" FontWeight="SemiBold">Sort</TextBlock>
+                        <TextBlock Grid.Row="3" Grid.Column="1">[Sort List] button</TextBlock>
+                    </Grid>
+
+                    <Rectangle Fill="Gray" Height="1" Margin="0,12"/>
+
+                    <!-- Renaming -->
+                    <TextBlock FontWeight="Bold">Renaming (single or bulk)</TextBlock>
+                    <Grid Margin="0,4,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="80"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Grid.Column="0" FontWeight="SemiBold">Manual</TextBlock>
+                        <TextBlock Grid.Row="0" Grid.Column="1">Double-click, F2, or context menu</TextBlock>
+                        <TextBlock Grid.Row="1" Grid.Column="0" FontWeight="SemiBold">Auto</TextBlock>
+                        <TextBlock Grid.Row="1" Grid.Column="1">Context menu → Auto Rename</TextBlock>
+                        <TextBlock Grid.Row="2" Grid.Column="0" FontWeight="SemiBold">Case</TextBlock>
+                        <TextBlock Grid.Row="2" Grid.Column="1">Title / Upper / Lower case</TextBlock>
+                    </Grid>
+
+                    <Rectangle Fill="Gray" Height="1" Margin="0,12"/>
+
+                    <!-- Assign Folder Path -->
+                    <TextBlock FontWeight="Bold">Assign Folder Path (single or bulk)</TextBlock>
+                    <TextBlock Margin="0,4,0,0" TextWrapping="Wrap">Context menu → Assign Folder Path to organize games into folders</TextBlock>
+                </StackPanel>
+
+                <!-- Right Column -->
+                <StackPanel Grid.Column="2">
+                    <!-- Artwork -->
+                    <TextBlock FontWeight="Bold">Artwork (openMenu mode)</TextBlock>
+                    <TextBlock Margin="0,4,0,0" TextWrapping="Wrap">Click Assign/Manage button in the Art column to set box art</TextBlock>
+
+                    <Rectangle Fill="Gray" Height="1" Margin="0,12"/>
+
+                    <!-- DAT Tools -->
+                    <TextBlock FontWeight="Bold">DAT Tools (openMenu mode)</TextBlock>
+                    <TextBlock Margin="0,4,0,0">Import DAT Entries from external folder</TextBlock>
+                    <TextBlock>Export Artwork to PNG files</TextBlock>
+                    <TextBlock>Clear All DAT Entries</TextBlock>
+
+                    <Rectangle Fill="Gray" Height="1" Margin="0,12"/>
+
+                    <!-- Disc Image Options -->
+                    <TextBlock FontWeight="Bold">Disc Image Options</TextBlock>
+                    <Grid Margin="0,4,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="110"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Grid.Column="0" FontWeight="SemiBold">VGA Patch</TextBlock>
+                        <TextBlock Grid.Row="0" Grid.Column="1">Force VGA output</TextBlock>
+                        <TextBlock Grid.Row="1" Grid.Column="0" FontWeight="SemiBold">Region-Free</TextBlock>
+                        <TextBlock Grid.Row="1" Grid.Column="1">Boot out-of-region games</TextBlock>
+                    </Grid>
+
+                    <Rectangle Fill="Gray" Height="1" Margin="0,12"/>
+
+                    <!-- File/Folder Lock Check -->
+                    <TextBlock FontWeight="Bold">File/Folder Lock Check</TextBlock>
+                    <TextBlock Margin="0,4,0,0" TextWrapping="Wrap">When enabled, checks all files and folders before saving to ensure nothing is locked by another process (e.g., file browser, antivirus). Disable if experiencing slow save times on large SD cards.</TextBlock>
+                </StackPanel>
+            </Grid>
+
+            <Rectangle Fill="Gray" Height="1" Margin="0,12"/>
+
+            <!-- Credits -->
+            <TextBlock FontWeight="Bold">Credits</TextBlock>
+            <TextBlock Margin="0,4,0,0" TextWrapping="Wrap">GDEMU - Deunan; GDmenu - neuroacid; openMenu - mrneo240; GdiBuilder - Paul Kratt; Aaru - Natalia Portillo; PuyoTools - Nick Woronekin; Redump2CDI - darc; gdidrop - feyris-tan; ImageSharp - SixLabors; ClosedXML - Jan Havlíček; SharpCompress - Adam Hathcock</TextBlock>
+        </StackPanel>
+    </Grid>
+</Window>

@@ -1,27 +1,127 @@
-name: Build Dreamcast Project
+name: Build openMenu with DC Now
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+    branches: [ "**" ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Run checkout on the host (not inside the old Docker container)
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
 
-      # Step 2: Run the build inside the Docker container
-      - name: Compile Project
-        run: |
-          docker run --rm -v ${{ github.workspace }}:/src -w /src nold360/kallistios-sdk:latest /bin/bash -c "
-            source /opt/toolchains/dc/kos/environ.sh && \
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Pull openMenu dev container
+      run: |
+        echo "Pulling pre-built Docker image..."
+        docker pull sbstnc/openmenu-dev:0.2.2
+
+    - name: Build openMenu for Dreamcast
+      run: |
+        echo "========================================="
+        echo "Building openMenu with DC Now Feature"
+        echo "========================================="
+
+        docker run --rm \
+          --user root \
+          -v "$PWD":/workspace \
+          -w /workspace/openMenu \
+          sbstnc/openmenu-dev:0.2.2 \
+          /bin/bash -c "
+            set -e
+            source /opt/toolchains/dc/kos/environ.sh
+
+            echo 'KallistiOS environment:'
+            echo \"KOS_BASE=\$KOS_BASE\"
+            echo \"KOS_CMAKE_TOOLCHAIN=\$KOS_CMAKE_TOOLCHAIN\"
+
+            echo ''
+            echo 'Building libppp (PPP addon for modem/DreamPi support)...'
+            cd \$KOS_BASE/addons/libppp
+            make clean || true
             make
+
+            echo ''
+            echo 'Verifying libppp.a was built:'
+            ls -lh \$KOS_BASE/addons/lib/dreamcast/libppp.a
+
+            echo ''
+            echo 'Returning to workspace...'
+            cd /workspace/openMenu
+
+            echo ''
+            echo 'Cleaning previous openMenu build...'
+            rm -rf cmake-build-dc-release
+
+            echo 'Configuring with CMake preset...'
+            cmake --preset dc-release
+
+            echo 'Building with Ninja...'
+            cmake --build cmake-build-dc-release
+
+            echo ''
+            echo 'Build successful!'
+            ls -lh cmake-build-dc-release/bin/1ST_READ.BIN
           "
 
-      # Step 3: Upload the resulting binary
-      - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: dreamcast-binary
-          path: "**/*.elf"
+        echo ""
+        echo "========================================="
+        echo "Build Complete!"
+        echo "========================================="
+
+    - name: Verify build output
+      run: |
+        if [ ! -f "openMenu/cmake-build-dc-release/bin/1ST_READ.BIN" ]; then
+          echo "ERROR: 1ST_READ.BIN not found!"
+          exit 1
+        fi
+
+        echo "Build artifact found:"
+        ls -lh openMenu/cmake-build-dc-release/bin/1ST_READ.BIN
+
+        echo ""
+        echo "File details:"
+        file openMenu/cmake-build-dc-release/bin/1ST_READ.BIN
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: openmenu-dreamcast-dcnow
+        path: |
+          openMenu/cmake-build-dc-release/bin/1ST_READ.BIN
+          openMenu/cmake-build-dc-release/bin/*.elf
+        if-no-files-found: error
+        retention-days: 90
+
+    - name: Create build summary
+      run: |
+        echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Status:** ✅ Build successful" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Output:** \`1ST_READ.BIN\` ready for Dreamcast" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Features:**" >> $GITHUB_STEP_SUMMARY
+        echo "- DC Now feature with DreamPi dial-up support" >> $GITHUB_STEP_SUMMARY
+        echo "- HTTP client for dreamcast.online/now API" >> $GITHUB_STEP_SUMMARY
+        echo "- Live player stats popup (L+R triggers)" >> $GITHUB_STEP_SUMMARY
+        echo "- PPP modem initialization matching ClassiCube" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Installation:**" >> $GITHUB_STEP_SUMMARY
+        echo "1. Download \`1ST_READ.BIN\` from artifacts" >> $GITHUB_STEP_SUMMARY
+        echo "2. Copy to SD card folder 01" >> $GITHUB_STEP_SUMMARY
+        echo "3. Boot Dreamcast with GDEMU" >> $GITHUB_STEP_SUMMARY
+        echo "4. Press L+R triggers to activate DC Now" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        FILE_SIZE=$(stat -c%s openMenu/cmake-build-dc-release/bin/1ST_READ.BIN)
+        echo "**Binary size:** $(numfmt --to=iec-i --suffix=B $FILE_SIZE)" >> $GITHUB_STEP_SUMMARY

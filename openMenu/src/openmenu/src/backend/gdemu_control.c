@@ -10,6 +10,7 @@
 #include "backend/gdemu_sdk.h"
 #include "backend/gdmenu_binary.h"
 #include "vm2/vm2_api.h"
+#include "../dcnow/dcnow_net_init.h"
 
 extern int vm2_device_count;
 extern void vm2_rescan(void);
@@ -54,6 +55,9 @@ wait_cd_ready(gd_item* disc) {
 
 void
 bloom_launch(gd_item* disc) {
+    /* Disconnect modem/PPP before launching PSX game to ensure clean state */
+    dcnow_net_disconnect();
+
     file_t fd;
     uint32_t bloom_size;
     uint8_t* bloom_buf;
@@ -85,6 +89,9 @@ bloom_launch(gd_item* disc) {
 
 void
 bleem_launch(gd_item* disc) {
+    /* Disconnect modem/PPP before launching PSX game to ensure clean state */
+    dcnow_net_disconnect();
+
     file_t fd;
     uint32_t bleem_size;
     uint8_t* bleem_buf;
@@ -125,6 +132,9 @@ bleem_launch(gd_item* disc) {
 
 void
 dreamcast_launch_disc(gd_item* disc) {
+    /* Disconnect modem/PPP before launching game to ensure clean state */
+    dcnow_net_disconnect();
+
     /* For non-game discs (audio CDs, etc.), just mount and exit to BIOS */
     if (!strcmp(disc->type, "other")) {
         gdemu_set_img_num((uint16_t)disc->slot_num);
@@ -209,6 +219,9 @@ dreamcast_launch_disc(gd_item* disc) {
 
 void
 dreamcast_launch_cb(gd_item* disc) {
+    /* Disconnect modem/PPP before launching CodeBreaker to ensure clean state */
+    dcnow_net_disconnect();
+
     file_t fd;
     uint32_t cb_size;
     uint8_t* cb_buf;

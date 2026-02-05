@@ -1,0 +1,93 @@
+<Window x:Class="GDMENUCardManager.DiscImageOptionsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:conv="clr-namespace:GDMENUCardManager.Converter"
+        mc:Ignorable="d"
+        Title="Disc Image Options" Height="520" Width="320"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
+    <Window.Resources>
+        <conv:BoolToVisibleOrCollapsedConverter x:Key="BoolToVisibleOrCollapsed"/>
+    </Window.Resources>
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Card Boxes - Vertically Stacked -->
+        <StackPanel Grid.Row="0" Orientation="Vertical" HorizontalAlignment="Stretch">
+
+            <!-- GDI Shrink Card -->
+            <GroupBox Margin="0 0 0 10">
+                <GroupBox.Header>
+                    <TextBlock Text="GDI Shrink" FontWeight="Bold"/>
+                </GroupBox.Header>
+                <StackPanel Margin="8">
+                    <TextBlock Text="Games use less space on SD card" TextWrapping="Wrap"
+                               Foreground="Gray" FontSize="11" Margin="0 0 0 10"/>
+                    <CheckBox x:Name="ChkEnableGDIShrink" IsChecked="{Binding EnableGDIShrink, Mode=TwoWay}">
+                        <TextBlock Text="Apply to newly added games"/>
+                    </CheckBox>
+                    <CheckBox IsChecked="{Binding EnableGDIShrinkExisting, Mode=TwoWay}"
+                              IsEnabled="{Binding IsChecked, ElementName=ChkEnableGDIShrink}" Margin="0 5 0 0">
+                        <TextBlock Text="Apply to existing games"/>
+                    </CheckBox>
+                    <Separator Margin="0 8"/>
+                    <CheckBox IsChecked="{Binding EnableGDIShrinkCompressed, Mode=TwoWay}"
+                              IsEnabled="{Binding IsChecked, ElementName=ChkEnableGDIShrink}">
+                        <TextBlock Text="Also shrink compressed" FontSize="11"/>
+                    </CheckBox>
+                    <CheckBox IsChecked="{Binding EnableGDIShrinkBlackList, Mode=TwoWay}"
+                              IsEnabled="{Binding IsChecked, ElementName=ChkEnableGDIShrink}" Margin="0 3 0 0"
+                              Visibility="{Binding HaveGDIShrinkBlacklist, Mode=OneWay, Converter={StaticResource BoolToVisibleOrCollapsed}}">
+                        <TextBlock Text="Use blacklist (recommended)" FontSize="11"/>
+                    </CheckBox>
+                </StackPanel>
+            </GroupBox>
+
+            <!-- VGA Patch Card -->
+            <GroupBox Margin="0 0 0 10">
+                <GroupBox.Header>
+                    <TextBlock Text="VGA Patch" FontWeight="Bold"/>
+                </GroupBox.Header>
+                <StackPanel Margin="8">
+                    <TextBlock Text="Force VGA flag after &quot;Exit to BIOS&quot; from openMenu" TextWrapping="Wrap"
+                               Foreground="Gray" FontSize="11" Margin="0 0 0 10"/>
+                    <CheckBox x:Name="ChkEnableVgaPatch" IsChecked="{Binding EnableVgaPatch, Mode=TwoWay}">
+                        <TextBlock Text="Apply to newly added games"/>
+                    </CheckBox>
+                    <CheckBox IsChecked="{Binding EnableVgaPatchExisting, Mode=TwoWay}"
+                              IsEnabled="{Binding IsChecked, ElementName=ChkEnableVgaPatch}" Margin="0 5 0 0">
+                        <TextBlock Text="Apply to existing games"/>
+                    </CheckBox>
+                </StackPanel>
+            </GroupBox>
+
+            <!-- Region-Free Patch Card -->
+            <GroupBox Margin="0 0 0 10">
+                <GroupBox.Header>
+                    <TextBlock Text="Region-Free Patch" FontWeight="Bold"/>
+                </GroupBox.Header>
+                <StackPanel Margin="8">
+                    <TextBlock Text="Boot out-of-region games after &quot;Exit to BIOS&quot; from openMenu" TextWrapping="Wrap"
+                               Foreground="Gray" FontSize="11" Margin="0 0 0 10"/>
+                    <CheckBox x:Name="ChkEnableRegionPatch" IsChecked="{Binding EnableRegionPatch, Mode=TwoWay}">
+                        <TextBlock Text="Apply to newly added games"/>
+                    </CheckBox>
+                    <CheckBox IsChecked="{Binding EnableRegionPatchExisting, Mode=TwoWay}"
+                              IsEnabled="{Binding IsChecked, ElementName=ChkEnableRegionPatch}" Margin="0 5 0 0">
+                        <TextBlock Text="Apply to existing games"/>
+                    </CheckBox>
+                </StackPanel>
+            </GroupBox>
+        </StackPanel>
+
+        <!-- Save/Cancel Buttons -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0 5 0 0">
+            <Button Content="Save" Width="80" Height="26" Margin="0 0 10 0" Click="SaveButton_Click" IsDefault="True"/>
+            <Button Content="Cancel" Width="80" Height="26" Click="CancelButton_Click" IsCancel="True"/>
+        </StackPanel>
+    </Grid>
+</Window>

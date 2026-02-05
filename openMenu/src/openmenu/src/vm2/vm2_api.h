@@ -20,3 +20,4 @@ typedef struct maple_alldevinfo {
 
 int vm2_set_id(maple_device_t* dev, const char* ID, const char* name);
 int check_vm2_present(maple_device_t* dev);
+const char* get_vmu_type_name(maple_device_t* dev);
